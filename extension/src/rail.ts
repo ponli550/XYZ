@@ -68,6 +68,9 @@ export interface RailModel {
   degraded?: string[];
   /** Budget window, when the model refused. Also shown rather than hidden. */
   budget?: { limited: boolean; until: number | null; pending: number } | null;
+  /** What the user has actually granted. The footer must not overstate this. */
+  capabilities?: string[];
+  paused?: boolean;
 }
 
 export interface RailHandlers {
@@ -186,6 +189,13 @@ export function renderRail(root: ShadowRoot, model: RailModel, h: RailHandlers):
   }
   for (const e of live) rail.append(renderCard(e, h));
 
-  rail.append(el('div', 'cap', '🔒 can comment · transition — read-only everywhere else'));
+  // The footer stated "can comment · transition" regardless of what was
+  // switched on. Claiming a power the agent does not have is the same class of
+  // bug as drafting a comment that promises a close it cannot perform.
+  const caps = model.capabilities ?? [];
+  rail.append(el('div', 'cap',
+    model.paused ? '⏸ paused — the agent will not act'
+    : caps.length ? `🔒 can ${caps.join(' · ')} — read-only everywhere else`
+    : '🔒 read-only — no write capability granted'));
   root.append(rail);
 }

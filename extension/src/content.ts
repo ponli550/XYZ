@@ -54,7 +54,8 @@ export function ticketKeyFrom(url: string): string | null {
 
 async function load(ticketKey: string): Promise<RailModel> {
   const stored = await chrome.storage.local.get(
-    ['escalations', 'heartbeat', 'counter', 'degraded', 'budget']);
+    ['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
+     'capabilities', 'paused']);
   const all: Escalation[] = stored.escalations ?? FIXTURES;
   return {
     escalations: all.filter((e) => e.ticketKey === ticketKey),
@@ -64,6 +65,8 @@ async function load(ticketKey: string): Promise<RailModel> {
     heartbeat: stored.heartbeat ?? null,
     degraded: stored.degraded ?? [],
     budget: stored.budget ?? null,
+    capabilities: stored.capabilities ?? [],
+    paused: Boolean(stored.paused),
   };
 }
 
@@ -128,7 +131,8 @@ if (typeof history !== 'undefined' && typeof chrome !== 'undefined') {
   // repaints in place rather than waiting for the next navigation.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (['escalations', 'heartbeat', 'counter', 'degraded', 'budget'].some((k) => k in changes)) {
+    if (['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
+         'capabilities', 'paused'].some((k) => k in changes)) {
       void paint();
     }
   });

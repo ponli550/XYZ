@@ -70,10 +70,27 @@ test('the counter is real: most artifacts cost nothing', () => {
 
 test('external deps are parsed, filler words are not', () => {
   assert.deepEqual(parseExternalDeps('Blocked on lib-x upstream'), ['lib-x']);
-  assert.deepEqual(parseExternalDeps('waiting for @octocat review'), []);
   assert.deepEqual(parseExternalDeps('blocked by the thing'), []);
   assert.deepEqual(parseExternalDeps('depends on openssl3 and blocked on lib-y'),
                    ['openssl3', 'lib-y']);
+});
+
+test('prose ABOUT blocking is not a blocker — the #13 false positive', () => {
+  // Real body from this repo's issue #13, which described the policy feature
+  // and was read as an issue blocked on a package named "policy".
+  assert.deepEqual(
+    parseExternalDeps("every allow/deny decision writes an audit entry with a 'blocked by policy' row"),
+    [], 'a bare English word is never a dependency');
+  assert.deepEqual(parseExternalDeps('waiting for review'), []);
+  assert.deepEqual(parseExternalDeps('blocked on approval'), []);
+  assert.deepEqual(parseExternalDeps('waiting on feedback'), []);
+});
+
+test('but real package shapes still resolve', () => {
+  assert.deepEqual(parseExternalDeps('blocked on @trigger.dev/sdk'), ['@trigger.dev/sdk']);
+  assert.deepEqual(parseExternalDeps('waiting on node18'), ['node18']);
+  assert.deepEqual(parseExternalDeps('depends on aws-sdk.'), ['aws-sdk']);
+  assert.deepEqual(parseExternalDeps('blocked by octocat/hello-world'), ['octocat/hello-world']);
 });
 
 test('an empty sweep is not an error', () => {

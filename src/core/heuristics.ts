@@ -102,13 +102,40 @@ function externalBlocker(s: Snapshot): Candidate | null {
 const RULES = [mergedPullOpenIssue, redHeadOnOpenPull, assignedButDormant, externalBlocker] as const;
 
 /** Words that mark a body as claiming a blocked state. Intentionally small. */
-const BLOCKER_RE = /\b(?:blocked (?:on|by)|waiting (?:on|for)|depends on|pending)\s+([a-z0-9][a-z0-9._-]{2,30})/gi;
+const BLOCKER_RE = /\b(?:blocked (?:on|by)|waiting (?:on|for)|depends on|pending)\s+([a-z0-9@][a-z0-9._/-]{2,40})/gi;
+
+/**
+ * A dependency NAME, not an English word. This rule fired on issue #13 of this
+ * very repo, whose body contains the phrase "blocked by policy" while
+ * DESCRIBING the policy feature — and concluded the issue was blocked on a
+ * package called "policy". Prose that merely talks about blocking is the most
+ * common false positive an ambient agent can have, and a false card is far
+ * more expensive than a missed one: it is what makes people switch the agent
+ * off.
+ *
+ * So a candidate must LOOK like a package: a scope, a path, a version, an
+ * internal hyphen or dot. A bare lowercase English word never qualifies.
+ */
+function looksLikeDependency(w: string): boolean {
+  if (STOPWORDS.has(w)) return false;
+  if (w.startsWith('@') || w.includes('/')) return true;     // @scope/pkg
+  if (/\d/.test(w)) return true;                             // openssl3, node18
+  if (/[.-]/.test(w)) return true;                           // lib-x, foo.bar
+  return false;                                              // "policy", "review"
+}
+
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'this', 'that', 'it', 'them', 'those', 'these',
+  'review', 'merge', 'approval', 'ci', 'cd', 'policy', 'design', 'feedback',
+  'confirmation', 'input', 'someone', 'anyone', 'you', 'us', 'me', 'him', 'her',
+  'them-to', 'more', 'other', 'another', 'further', 'final', 'sign', 'signoff',
+]);
 
 export function parseExternalDeps(body: string): string[] {
   const out = new Set<string>();
   for (const m of body.matchAll(BLOCKER_RE)) {
-    const w = m[1]?.toLowerCase();
-    if (w && !/^(the|a|an|this|that|it|them|review|merge|approval|ci)$/.test(w)) out.add(w);
+    const w = m[1]?.toLowerCase().replace(/[.,;:)\]]+$/, '');
+    if (w && looksLikeDependency(w)) out.add(w);
   }
   return [...out];
 }
