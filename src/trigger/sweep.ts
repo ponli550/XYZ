@@ -27,7 +27,7 @@ interface SweepState {
 }
 
 const env = () => ({
-  github: process.env.GITHUB_TOKEN!,
+  github: process.env.SIDECAR_GH_TOKEN ?? process.env.GITHUB_TOKEN!,
   openrouter: process.env.OPENROUTER_KEY!,
   exa: process.env.EXA_KEY,
   store: process.env.STORE_URL!,       // the Worker, which is now only a store
