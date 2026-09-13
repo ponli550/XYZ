@@ -11,6 +11,8 @@ import { readRepo } from '../../src/core/sources.ts';
 import { sweep } from '../../src/core/heuristics.ts';
 import { draftEscalation } from '../../src/core/draft.ts';
 import { merge } from '../../src/core/merge.ts';
+import { evaluateWatches } from '../../src/core/watch.ts';
+import type { Snapshot } from '../../src/core/heuristics.ts';
 import { BudgetGuard } from '../../src/core/budget.ts';
 import type { Candidate } from '../../src/core/heuristics.ts';
 
@@ -143,6 +145,7 @@ async function poll(): Promise<void> {
   const degraded: string[] = [];
   let checked = 0;
   const candidates: Candidate[] = [];
+  const allSnapshots: Snapshot[] = [];
 
   for (const spec of st.repos as string[]) {
     const [owner, repo] = spec.replace('/*', '/').split('/');
@@ -161,7 +164,13 @@ async function poll(): Promise<void> {
     const result = sweep(ordered);
     checked += result.checked;
     candidates.push(...result.candidates);
+    allSnapshots.push(...r.snapshots);
   }
+
+  // Dismissals are evaluated BEFORE drafting: a re-opened finding already has
+  // its claim and proposal, so it costs nothing to bring back. Free, and it is
+  // the moment that reads as the agent having remembered.
+  const watched = evaluateWatches((st.escalations ?? []) as Escalation[], allSnapshots);
 
   // Draft only the candidates above the surfacing floor, and only until the
   // budget says stop. guarded() parks the rest for replay.
@@ -178,7 +187,9 @@ async function poll(): Promise<void> {
     if (out.escalation) drafted.push(out.escalation);
   }
 
-  const { escalations, fresh } = merge(st.escalations ?? [], drafted);
+  const { escalations, fresh } = merge(watched.escalations, drafted);
+  // A re-open deserves a notification even though it is not a new finding.
+  fresh.push(...watched.reopened);
   const notified: string[] = st.notified ?? [];
 
   for (const id of fresh) {
@@ -192,7 +203,9 @@ async function poll(): Promise<void> {
 
   await chrome.storage.local.set({
     escalations,
-    notified: [...new Set([...notified, ...fresh])],
+    // A re-opened finding was notified once already; it has to be allowed to
+    // notify again, or "it came back" is invisible.
+    notified: [...new Set([...notified.filter((n) => !watched.reopened.includes(n)), ...fresh])],
     heartbeat: new Date().toISOString(),
     degraded,
     // The counter is the real accounting, not decoration: checked minus what
