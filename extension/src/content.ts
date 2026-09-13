@@ -7,6 +7,7 @@
 // is appended to document.documentElement (outside anything Turbo owns) and
 // re-checked on every route change.
 import { renderRail, type RailModel } from './rail.ts';
+import { extract, completeness } from './extract.ts';
 import { FIXTURES, COUNTER } from '../../src/core/fixtures.ts';
 import type { Escalation } from '../../src/core/escalation.ts';
 
@@ -56,6 +57,13 @@ async function paint(): Promise<void> {
     return;
   }
   shadow = ensureHost();
+
+  // What the human is looking at, right now. Published so the watcher can
+  // prioritise the open artifact over everything else in its queue — that
+  // prioritisation is the whole reason the agent lives on the page.
+  const ctx = extract(document, key, location.pathname.includes('/pull/') ? 'pull' : 'issue');
+  void chrome.storage.local.set({ viewing: { ...ctx, completeness: completeness(ctx) } });
+
   const model = await load(key);
   renderRail(shadow, model, {
     onApprove: (id) => chrome.runtime.sendMessage({ type: 'approve', id }),
