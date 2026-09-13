@@ -14,6 +14,16 @@ export interface ReadConfig {
   baseUrl?: string;
 }
 
+interface GhCheckRuns {
+  check_runs: { status: string; conclusion: string | null }[];
+}
+
+interface GhPullDetail {
+  merged_at: string | null;
+  head: { sha: string };
+  mergeable_state?: string;
+}
+
 interface GhIssue {
   number: number;
   title: string;
@@ -58,6 +68,19 @@ export interface RepoState {
   degraded: string[];
 }
 
+/**
+ * Collapse GitHub's check runs into one verdict. Any failure is a failure;
+ * anything still running is pending; otherwise success. A PR with no checks at
+ * all returns null rather than 'success' — "nobody ran anything" must not be
+ * mistaken for "everything passed".
+ */
+export function ciVerdict(runs: GhCheckRuns['check_runs']): Snapshot['ci'] {
+  if (!runs.length) return null;
+  if (runs.some((r) => r.conclusion === 'failure' || r.conclusion === 'timed_out')) return 'failure';
+  if (runs.some((r) => r.status !== 'completed')) return 'pending';
+  return runs.some((r) => r.conclusion === 'success') ? 'success' : null;
+}
+
 export async function readRepo(cfg: ReadConfig, owner: string, repo: string,
                                limit = 40): Promise<RepoState> {
   const degraded: string[] = [];
@@ -85,7 +108,7 @@ export async function readRepo(cfg: ReadConfig, owner: string, repo: string,
     let mergedAt: string | null = null;
     if (p.state === 'closed') {
       try {
-        const detail = await get<{ merged_at: string | null }>(cfg, `/repos/${full}/pulls/${p.number}`);
+        const detail = await get<GhPullDetail>(cfg, `/repos/${full}/pulls/${p.number}`);
         if (detail.merged_at) { state = 'merged'; mergedAt = detail.merged_at; }
       } catch (e) {
         degraded.push(`pull ${p.number}: ${e instanceof Error ? e.message : String(e)}`);
@@ -94,6 +117,37 @@ export async function readRepo(cfg: ReadConfig, owner: string, repo: string,
     for (const n of refs) {
       linkage.set(n, [...(linkage.get(n) ?? []), { number: p.number, state, mergedAt }]);
     }
+  }
+
+  // OPEN pull requests become snapshots too, with their CI verdict. Without
+  // this the redHeadOnOpenPull rule could never fire: it requires kind 'pull',
+  // and only issues were ever emitted. Two calls per open PR, and open PRs are
+  // few — closed ones are not worth the quota.
+  const pullSnapshots: Snapshot[] = [];
+  for (const p of pulls) {
+    if (p.state !== 'open') continue;
+    let ci: Snapshot['ci'] = null;
+    try {
+      const detail = await get<GhPullDetail>(cfg, `/repos/${full}/pulls/${p.number}`);
+      const checks = await get<GhCheckRuns>(cfg, `/repos/${full}/commits/${detail.head.sha}/check-runs`);
+      ci = ciVerdict(checks.check_runs ?? []);
+    } catch (e) {
+      degraded.push(`checks ${p.number}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    pullSnapshots.push({
+      key: `${full}#${p.number}`,
+      kind: 'pull',
+      state: 'open',
+      title: p.title,
+      body: p.body ?? '',
+      labels: p.labels.map((l) => l.name),
+      assignees: p.assignees.map((a) => a.login),
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      linkedPulls: [],
+      ci,
+      externalDeps: parseExternalDeps(p.body ?? ''),
+    });
   }
 
   const snapshots: Snapshot[] = issues.map((i) => ({
@@ -111,5 +165,5 @@ export async function readRepo(cfg: ReadConfig, owner: string, repo: string,
     externalDeps: parseExternalDeps(i.body ?? ''),
   }));
 
-  return { snapshots, degraded };
+  return { snapshots: [...snapshots, ...pullSnapshots], degraded };
 }
