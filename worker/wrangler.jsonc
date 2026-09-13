@@ -9,11 +9,11 @@
 	"observability": {
 		"enabled": true
 	},
-	// Every 10 minutes. The extension's own alarm is faster when Chrome is open;
-	// this exists for when it is not.
+	// Fallback only. The primary schedule is the Trigger.dev task, which retries
+	// per step and keeps a visible run history. Hourly so it cannot race it.
 	"triggers": {
 		"crons": [
-			"*/10 * * * *"
+			"0 * * * *"
 		]
 	},
 	"kv_namespaces": [

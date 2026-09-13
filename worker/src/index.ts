@@ -1,13 +1,15 @@
-// The sweep, off the laptop.
+// The shared store, and a fallback sweep.
 //
-// chrome.alarms only fires while Chrome is running, so the extension's watcher
-// stops when you close the lid. This Worker runs the SAME core modules on a
-// cron trigger, so the agent keeps finding things while nothing of yours is on.
+// The scheduled sweep now lives in Trigger.dev, which retries each step and
+// keeps a run history you can point at — "here is the run that fired at 03:14".
+// This Worker is what that sweep writes to and what the extension reads from:
+// one small, authenticated, edge-cached piece of state.
 //
-// It is deliberately not a token proxy. The extension keeps its own credential
-// and its own sweep; this is a second, independent watcher whose results the
-// extension merges in. Two sweeps that agree are idempotent — escalation ids
-// are `key:rule`, so the same finding from either side is the same card.
+// It keeps its own /sweep because a store that cannot refill itself is a single
+// point of failure. If Trigger.dev is down, POST /sweep still works.
+//
+// It is deliberately not a token proxy. It holds its own credential and never
+// sees the browser's.
 
 import { readRepo } from '../../src/core/sources.ts';
 import { sweep } from '../../src/core/heuristics.ts';
@@ -113,7 +115,9 @@ export async function runSweep(env: Env): Promise<State> {
 }
 
 export default {
-  // Cron trigger. This is the whole point: it runs with your laptop shut.
+  // Kept as a safety net: if the Trigger.dev schedule is down, the store still
+  // refills itself. Deliberately slower than the Trigger schedule so it is the
+  // fallback, not a second source of truth.
   async scheduled(_c: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(runSweep(env));
   },
@@ -133,6 +137,17 @@ export default {
     if (url.pathname === '/sweep' && req.method === 'POST') {
       const state = await runSweep(env);
       return Response.json(state, { headers: { 'cache-control': 'no-store' } });
+    }
+
+    // The scheduled sweep writes here. Authenticated with the same shared
+    // secret; it carries no GitHub credential and cannot cause a write to a repo.
+    if (url.pathname === '/state' && req.method === 'POST') {
+      const body = await req.json() as State;
+      if (!Array.isArray(body?.escalations)) {
+        return new Response('malformed state', { status: 400 });
+      }
+      await env.SIDECAR.put(KEY, JSON.stringify(body));
+      return Response.json({ ok: true, escalations: body.escalations.length });
     }
 
     if (url.pathname !== '/state' || req.method !== 'GET') {

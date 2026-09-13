@@ -15,11 +15,15 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260911.1",
+    "@trigger.dev/build": "^4.5.16",
     "@types/chrome": "^0.0.287",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^24.0.0",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "^4.5.16"
   }
 }

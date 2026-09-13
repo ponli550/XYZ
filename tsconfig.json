@@ -14,10 +14,12 @@
     "types": [
       "node",
       "chrome"
-    ]
+    ],
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*.ts",
-    "extension/src/**/*.ts"
+    "extension/src/**/*.ts",
+    "trigger.config.ts"
   ]
 }
