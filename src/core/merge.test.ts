@@ -70,3 +70,39 @@ test('findings on other artifacts are preserved, not dropped', () => {
   const r = merge([other], [esc()]);
   assert.equal(r.escalations.length, 2);
 });
+
+const ids = (...v: string[]) => new Set(v);
+
+test('a finding whose rule no longer fires is retired', () => {
+  const r = merge([esc()], [], ids());
+  assert.deepEqual(r.escalations, []);
+  assert.deepEqual(r.retired, ['o/r#5:merged-pull-open-issue']);
+});
+
+test('a finding that still fires is kept', () => {
+  const r = merge([esc()], [esc()], ids('o/r#5:merged-pull-open-issue'));
+  assert.equal(r.escalations.length, 1);
+  assert.deepEqual(r.retired, []);
+});
+
+test('a human decision is never retired behind their back', () => {
+  for (const state of ['dismissed', 'approved', 'verified'] as const) {
+    const r = merge([esc({ state })], [], ids());
+    assert.equal(r.escalations.length, 1, state);
+    assert.deepEqual(r.retired, [], state);
+  }
+});
+
+test('without liveIds nothing is retired — a degraded sweep must not erase findings', () => {
+  const r = merge([esc()], []);
+  assert.equal(r.escalations.length, 1,
+    'retiring on incomplete information would wipe real findings on every hiccup');
+  assert.deepEqual(r.retired, []);
+});
+
+test('retirement is per-finding, not per-artifact', () => {
+  const other = esc({ id: 'o/r#5:assigned-but-dormant' });
+  const r = merge([esc(), other], [], ids('o/r#5:assigned-but-dormant'));
+  assert.deepEqual(r.escalations.map((e) => e.id), ['o/r#5:assigned-but-dormant']);
+  assert.deepEqual(r.retired, ['o/r#5:merged-pull-open-issue']);
+});

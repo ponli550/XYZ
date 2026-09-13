@@ -20,11 +20,24 @@ export interface MergeResult {
   escalations: Escalation[];
   /** Ids that are newly surfaced this sweep — what deserves a notification. */
   fresh: string[];
+  /** Ids dropped because their rule no longer fires. */
+  retired: string[];
 }
 
-export function merge(existing: Escalation[], incoming: Escalation[]): MergeResult {
+/** States the agent owns. A human decision is never retired behind their back. */
+const AGENT_OWNED = new Set(['suspected', 'corroborating', 'confirmed', 'proposed', 'reopened']);
+
+/**
+ * @param liveIds ids the CURRENT sweep derived, as `key:rule`. Pass undefined
+ *   when the caller cannot enumerate them (a partial or degraded sweep), and
+ *   nothing is retired — retiring on incomplete information would erase real
+ *   findings every time GitHub hiccuped.
+ */
+export function merge(existing: Escalation[], incoming: Escalation[],
+                      liveIds?: Set<string>): MergeResult {
   const byId = new Map(existing.map((e) => [e.id, e]));
   const fresh: string[] = [];
+  const retired: string[] = [];
 
   for (const next of incoming) {
     const prev = byId.get(next.id);
@@ -57,5 +70,19 @@ export function merge(existing: Escalation[], incoming: Escalation[]): MergeResu
     byId.set(merged.id, merged);
   }
 
-  return { escalations: [...byId.values()], fresh };
+  // A finding that has stopped being true must leave. merge() only ever added
+  // and updated, so a card whose rule no longer fires stayed on screen forever
+  // — the exact inverse of the dismissal problem, and only one half was built.
+  // A stale card is a false card, and a false card is what makes people switch
+  // the agent off.
+  if (liveIds) {
+    for (const [id, e] of byId) {
+      if (!AGENT_OWNED.has(e.state)) continue;   // never retire a human decision
+      if (liveIds.has(id)) continue;
+      byId.delete(id);
+      retired.push(id);
+    }
+  }
+
+  return { escalations: [...byId.values()], fresh, retired };
 }

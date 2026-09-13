@@ -93,7 +93,11 @@ export async function runSweep(env: Env): Promise<State> {
     if (out.escalation) drafted.push({ ...out.escalation, detectedBy: 'ambient' });
   }
 
-  const { escalations } = merge(prev.escalations, drafted);
+  // Same retirement rule as the extension: only when the sweep was clean.
+  const liveIds = degraded.length
+    ? undefined
+    : new Set(candidates.map((c) => `${c.key}:${c.rule}`));
+  const { escalations } = merge(prev.escalations, drafted, liveIds);
   const next: State = {
     escalations,
     heartbeat: new Date().toISOString(),

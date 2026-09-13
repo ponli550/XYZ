@@ -228,7 +228,21 @@ async function poll(): Promise<void> {
     }
   }
 
-  const { escalations, fresh } = merge(watched.escalations, [...remote, ...drafted]);
+  // Every finding this sweep could derive, drafted or not. Passing it lets
+  // merge() retire cards whose rule has stopped firing. Only safe because the
+  // sweep completed: if a source degraded we do not know what we missed, so we
+  // retire nothing rather than erase real findings.
+  const liveIds = degraded.length
+    ? undefined
+    : new Set([...candidates.map((c) => `${c.key}:${c.rule}`),
+               ...remote.map((e) => e.id)]);
+
+  const { escalations, fresh, retired } = merge(
+    watched.escalations, [...remote, ...drafted], liveIds);
+
+  for (const id of retired) {
+    await audit(entry('dismissed', id.split(':')[0]!, 'retired — no longer true', 'agent'));
+  }
   // A re-open deserves a notification even though it is not a new finding.
   fresh.push(...watched.reopened);
   const notified: string[] = st.notified ?? [];
