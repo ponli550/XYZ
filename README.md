@@ -8,6 +8,8 @@ knows, and is waiting with a fix — on the page — the moment you open it.
 
 You never prompt it. There is no chat box. That is the point.
 
+**Demo: <https://youtu.be/J8KygnKkwAc>** (2 min 13 s)
+
 ---
 
 ## The problem
