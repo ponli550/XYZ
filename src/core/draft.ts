@@ -23,15 +23,32 @@ export interface ModelConfig {
   model: string;            // switchable live from the panel — see #13
   baseUrl?: string;
   maxOutputTokens?: number;
+  /**
+   * What the agent is actually permitted to do right now. The draft must not
+   * promise an action the policy forbids: the first real write said "Closing —"
+   * on an issue it had no power to close, because the model was never told.
+   */
+  capabilities?: ('comment' | 'transition')[];
 }
 
-const SYSTEM = `You write one-sentence findings for an agent that annotates GitHub issues.
+const BASE_SYSTEM = `You write one-sentence findings for an agent that annotates GitHub issues.
 A deterministic check has ALREADY established the contradiction — do not re-argue it,
 do not hedge, do not speculate beyond the evidence given.
 Reply with JSON only: {"claim": "...", "comment": "..."}
 claim: one sentence, present tense, states what is wrong with the artifact.
 comment: what to post on the issue. Plain, factual, under 200 characters, cites the
 evidence date. No greeting, no sign-off, no emoji.`;
+
+/** The comment must describe only what the agent can actually carry out. */
+function systemFor(caps: ('comment' | 'transition')[]): string {
+  return caps.includes('transition')
+    ? `${BASE_SYSTEM}
+You MAY close or reopen the issue, so the comment may state that it is being closed.`
+    : `${BASE_SYSTEM}
+You may ONLY leave a comment. You cannot close, reopen, label or assign anything.
+Never write that the issue is being closed or moved — say what is true and let a
+human act. Prefer wording like "this looks resolved by ..." over "closing —".`;
+}
 
 function brief(c: Candidate): string {
   const ev = c.evidence.map((e) => `- [${e.system}] ${e.excerpt} (${e.at})`).join('\n');
@@ -68,7 +85,7 @@ export async function callModel(cfg: ModelConfig, c: Candidate): Promise<Draft> 
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: SYSTEM },
+        { role: 'system', content: systemFor(cfg.capabilities ?? ['comment']) },
         { role: 'user', content: brief(c) },
       ],
     }),

@@ -83,3 +83,29 @@ test('a good response round-trips into the card', async () => {
   assert.match(r.escalation!.claim, /PR #12 merged/);
   assert.match((r.escalation!.proposal as { body: string }).body, /Closing/);
 });
+
+test('the draft only promises what the policy permits', async () => {
+  let sent = '';
+  globalThis.fetch = (async (_u: string, init: RequestInit) => {
+    sent = String(init.body);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: GOOD } }] }) };
+  }) as unknown as typeof fetch;
+
+  const guard = new BudgetGuard<Candidate>();
+  await draftEscalation(guard, { ...cfg, capabilities: ['comment'] }, cand, at);
+  assert.match(sent, /may ONLY leave a comment/);
+  assert.match(sent, /Never write that the issue is being closed/);
+
+  await draftEscalation(guard, { ...cfg, capabilities: ['comment', 'transition'] }, cand, at);
+  assert.match(sent, /You MAY close or reopen/);
+});
+
+test('capabilities default to comment-only, the safe assumption', async () => {
+  let sent = '';
+  globalThis.fetch = (async (_u: string, init: RequestInit) => {
+    sent = String(init.body);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: GOOD } }] }) };
+  }) as unknown as typeof fetch;
+  await draftEscalation(new BudgetGuard<Candidate>(), cfg, cand, at);
+  assert.match(sent, /may ONLY leave a comment/);
+});
