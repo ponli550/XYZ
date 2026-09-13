@@ -8,10 +8,14 @@
 // re-checked on every route change.
 import { renderRail, type RailModel } from './rail.ts';
 import { extract, completeness } from './extract.ts';
+import { renderCreature, moodFor } from './creature.ts';
 import type { Escalation } from '../../src/core/escalation.ts';
 
 const HOST_ID = 'sidecar-host';
 const RAIL_W = 340;
+
+/** Collapsed by default. The rail is what you open, not what greets you. */
+let expanded = false;
 
 /**
  * Reserve the rail's width on the document instead of floating over it.
@@ -76,7 +80,6 @@ async function paint(): Promise<void> {
     return;
   }
   shadow = ensureHost();
-  reserveGutter(true);
 
   // What the human is looking at, right now. Published so the watcher can
   // prioritise the open artifact over everything else in its queue — that
@@ -85,9 +88,33 @@ async function paint(): Promise<void> {
   void chrome.storage.local.set({ viewing: { ...ctx, completeness: completeness(ctx) } });
 
   const model = await load(key);
+  const waiting = model.escalations.filter((e) => e.state === 'proposed').length;
+
+  // Collapsed, the agent is a presence on the page rather than a panel beside
+  // it. The gutter is only reserved once you open the rail — an agent that
+  // reflows your page before you have asked for anything is an intrusion.
+  if (!expanded) {
+    reserveGutter(false);
+    const { creaturePos } = await chrome.storage.local.get('creaturePos');
+    renderCreature(shadow, {
+      mood: moodFor({
+        paused: model.paused,
+        limited: model.budget?.limited,
+        pending: model.budget?.pending,
+        waiting,
+      }),
+      count: waiting,
+      x: creaturePos?.x ?? window.innerWidth - 130,
+      y: creaturePos?.y ?? window.innerHeight - 120,
+    }, { onOpen: () => { expanded = true; void paint(); } });
+    return;
+  }
+
+  reserveGutter(true);
   renderRail(shadow, model, {
     onApprove: (id) => chrome.runtime.sendMessage({ type: 'approve', id }),
     onDismiss: (id) => chrome.runtime.sendMessage({ type: 'dismiss', id }),
+    onCollapse: () => { expanded = false; void paint(); },
   });
 }
 

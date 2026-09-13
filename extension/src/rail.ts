@@ -19,7 +19,10 @@ const CSS = `
 }
 .head { position: sticky; top: 0; background: inherit; padding: 12px 14px;
   border-bottom: 1px solid #dfe1e6; display: flex; flex-direction: column; gap: 4px; }
-.brand { font-weight: 600; letter-spacing: .02em; }
+.brand { font-weight: 600; letter-spacing: .02em; display: flex; align-items: center; }
+.collapse { margin-left: auto; border: 0; background: none; font-size: 15px;
+  line-height: 1; padding: 0 2px; cursor: pointer; color: inherit; opacity: .45; }
+.collapse:hover { opacity: 1; }
 .counter { font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
 .beat { font-size: 11px; opacity: .5; }
 .beat.stale { color: #ae2e24; opacity: 1; }
@@ -76,6 +79,7 @@ export interface RailModel {
 export interface RailHandlers {
   onApprove(id: string): void;
   onDismiss(id: string): void;
+  onCollapse(): void;
 }
 
 const el = (tag: string, cls?: string, text?: string): HTMLElement => {
@@ -163,7 +167,12 @@ export function renderRail(root: ShadowRoot, model: RailModel, h: RailHandlers):
   const rail = el('div', 'rail');
 
   const head = el('div', 'head');
-  head.append(el('div', 'brand', 'Sidecar'));
+  const brand = el('div', 'brand', 'Sidecar');
+  const collapse = el('button', 'collapse', '\u00d7') as HTMLButtonElement;
+  collapse.title = 'Collapse';
+  collapse.addEventListener('click', () => h.onCollapse());
+  brand.append(collapse);
+  head.append(brand);
   const { checked, auto, escalated } = model.counter;
   head.append(el('div', 'counter', `${checked} checked · ${auto} auto · ${escalated} for you`));
   const stale = model.heartbeat === null ||
