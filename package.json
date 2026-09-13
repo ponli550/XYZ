@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild extension/src/content.ts extension/src/background.ts --bundle --format=esm --outdir=extension --log-level=warning",
+    "build": "npm run build:content && npm run build:sw",
     "watch": "npm run build -- --watch",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts' 'extension/src/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:content": "esbuild extension/src/content.ts --bundle --format=iife --outfile=extension/content.js --log-level=warning",
+    "build:sw": "esbuild extension/src/background.ts --bundle --format=esm --outfile=extension/background.js --log-level=warning"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
