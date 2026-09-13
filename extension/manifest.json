@@ -9,7 +9,9 @@
     "notifications"
   ],
   "host_permissions": [
-    "https://github.com/*"
+    "https://github.com/*",
+    "https://api.github.com/*",
+    "https://openrouter.ai/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -33,5 +35,6 @@
   },
   "icons": {
     "128": "icon128.png"
-  }
+  },
+  "options_page": "options.html"
 }

@@ -1,0 +1,46 @@
+<meta charset="utf-8">
+<title>Sidecar</title>
+<style>
+  body { font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 520px; margin: 40px auto; padding: 0 20px; color: #1f2328; }
+  @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { opacity: .6; margin: 0 0 24px; font-size: 13px; }
+  label { display: block; font-weight: 600; margin: 18px 0 4px; font-size: 13px; }
+  input[type=text], input[type=password] { width: 100%; padding: 7px 9px; font: inherit;
+    border: 1px solid #d0d7de; border-radius: 6px; background: transparent; color: inherit; }
+  .hint { font-size: 12px; opacity: .6; margin-top: 4px; }
+  .caps { display: flex; gap: 16px; margin-top: 6px; }
+  .caps label { font-weight: 400; margin: 0; display: flex; gap: 6px; align-items: center; }
+  button { margin-top: 24px; padding: 7px 14px; font: inherit; border-radius: 6px;
+    border: 1px solid #0c66e4; background: #0c66e4; color: #fff; cursor: pointer; }
+  #saved { margin-left: 10px; font-size: 13px; color: #1a7f37; opacity: 0; transition: opacity .2s; }
+  #saved.on { opacity: 1; }
+</style>
+<h1>Sidecar</h1>
+<p class="sub">The agent can only do what is switched on here. Everything else is read-only.</p>
+
+<label for="gh">GitHub token</label>
+<input id="gh" type="password" placeholder="ghp_… or gho_…" autocomplete="off">
+<div class="hint">Run <code>gh auth token</code>. Stored locally in this browser profile only.</div>
+
+<label for="or">OpenRouter key</label>
+<input id="or" type="password" placeholder="sk-or-…" autocomplete="off">
+
+<label for="model">Model</label>
+<input id="model" type="text" placeholder="openai/gpt-4o-mini">
+
+<label for="repos">Repos the agent may touch</label>
+<input id="repos" type="text" placeholder="ponli550/XYZ, ponli550/*">
+<div class="hint">Comma separated. Empty means the agent can write nowhere — that is the default.</div>
+
+<label>Write capabilities</label>
+<div class="caps">
+  <label><input type="checkbox" id="cap-comment"> comment</label>
+  <label><input type="checkbox" id="cap-transition"> open / close</label>
+</div>
+
+<label><input type="checkbox" id="paused"> Pause the agent entirely</label>
+
+<button id="save">Save</button><span id="saved">saved</span>
+<script src="options.js"></script>
