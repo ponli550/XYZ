@@ -9,3 +9,6 @@ npm-debug.log*
 # Build
 dist/
 .trigger/
+dist/
+extension/content.js
+extension/background.js

@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Sidecar",
+  "version": "0.1.0",
+  "description": "An agent that is already on the ticket when you open it.",
+  "permissions": ["storage", "alarms", "notifications"],
+  "host_permissions": ["https://*.atlassian.net/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.atlassian.net/browse/*", "https://*.atlassian.net/jira/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "Sidecar" }
+}
