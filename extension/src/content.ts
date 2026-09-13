@@ -12,6 +12,21 @@ import { FIXTURES, COUNTER } from '../../src/core/fixtures.ts';
 import type { Escalation } from '../../src/core/escalation.ts';
 
 const HOST_ID = 'sidecar-host';
+const RAIL_W = 340;
+
+/**
+ * Reserve the rail's width on the document instead of floating over it.
+ * Overlaying hid GitHub's own sidebar (assignees, labels), which makes the
+ * agent look like something covering your work rather than part of it —
+ * exactly the impression this whole design is trying to avoid.
+ */
+function reserveGutter(on: boolean): void {
+  const root = document.documentElement;
+  root.style.marginRight = on ? `${RAIL_W}px` : '';
+  root.style.transition = 'margin-right .12s ease-out';
+  // GitHub pins its own header; without this it stays full-bleed under the rail.
+  root.style.setProperty('--sidecar-gutter', on ? `${RAIL_W}px` : '0px');
+}
 
 let shadow: ShadowRoot | null = null;
 let current = '';
@@ -53,10 +68,12 @@ async function paint(): Promise<void> {
   const key = ticketKeyFrom(location.href);
   if (!key) {
     document.getElementById(HOST_ID)?.remove();
+    reserveGutter(false);
     shadow = null;
     return;
   }
   shadow = ensureHost();
+  reserveGutter(true);
 
   // What the human is looking at, right now. Published so the watcher can
   // prioritise the open artifact over everything else in its queue — that
