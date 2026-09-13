@@ -31,6 +31,19 @@
     badge.classList.add("on");
     setTimeout(() => badge.classList.remove("on"), 1200);
   }
+  async function reset() {
+    await chrome.storage.local.remove(
+      ["escalations", "notified", "auditLog", "counter", "heartbeat", "degraded", "budget", "viewing"]
+    );
+    const badge = document.getElementById("saved");
+    badge.textContent = "reset";
+    badge.classList.add("on");
+    setTimeout(() => {
+      badge.classList.remove("on");
+      badge.textContent = "saved";
+    }, 1400);
+  }
   document.getElementById("save").addEventListener("click", () => void save());
+  document.getElementById("reset").addEventListener("click", () => void reset());
   void restore();
 })();

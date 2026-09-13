@@ -34,5 +34,19 @@ async function save(): Promise<void> {
   setTimeout(() => badge.classList.remove('on'), 1200);
 }
 
+/**
+ * Everything the agent has learned, dropped. Settings survive, because the
+ * point is a clean slate for a run — not re-entering a token.
+ */
+async function reset(): Promise<void> {
+  await chrome.storage.local.remove(
+    ['escalations', 'notified', 'auditLog', 'counter', 'heartbeat', 'degraded', 'budget', 'viewing']);
+  const badge = document.getElementById('saved')!;
+  badge.textContent = 'reset';
+  badge.classList.add('on');
+  setTimeout(() => { badge.classList.remove('on'); badge.textContent = 'saved'; }, 1400);
+}
+
 document.getElementById('save')!.addEventListener('click', () => void save());
+document.getElementById('reset')!.addEventListener('click', () => void reset());
 void restore();

@@ -6,7 +6,6 @@ import { transition } from '../../src/core/escalation.ts';
 import { execute, verifyComment, checkPolicy, DEFAULT_POLICY,
          type Policy, type GitHubConfig } from '../../src/core/github.ts';
 import { entry, append, type AuditEntry } from '../../src/core/audit.ts';
-import { FIXTURES } from '../../src/core/fixtures.ts';
 import { readRepo } from '../../src/core/sources.ts';
 import { sweep } from '../../src/core/heuristics.ts';
 import { draftEscalation } from '../../src/core/draft.ts';
@@ -24,11 +23,9 @@ const POLL_ALARM = 'sidecar-poll';
 
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create(POLL_ALARM, { periodInMinutes: 2 });
-  // Seed the demo escalations so Approve has something real to mutate. The
-  // rail falls back to the same fixtures in memory, but the service worker
-  // writes through storage, so they have to exist there too.
-  const { escalations } = await chrome.storage.local.get('escalations');
-  if (!escalations) await chrome.storage.local.set({ escalations: FIXTURES });
+  // Fixtures were scaffolding for building the rail before the watcher
+  // existed. The watcher is real now, so a fresh install starts empty and
+  // fills from the repo — seeded cards alongside real ones is just confusing.
 });
 
 chrome.alarms.onAlarm.addListener((a) => {

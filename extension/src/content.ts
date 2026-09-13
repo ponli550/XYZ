@@ -8,7 +8,6 @@
 // re-checked on every route change.
 import { renderRail, type RailModel } from './rail.ts';
 import { extract, completeness } from './extract.ts';
-import { FIXTURES, COUNTER } from '../../src/core/fixtures.ts';
 import type { Escalation } from '../../src/core/escalation.ts';
 
 const HOST_ID = 'sidecar-host';
@@ -56,12 +55,10 @@ async function load(ticketKey: string): Promise<RailModel> {
   const stored = await chrome.storage.local.get(
     ['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
      'capabilities', 'paused']);
-  const all: Escalation[] = stored.escalations ?? FIXTURES;
+  const all: Escalation[] = stored.escalations ?? [];
   return {
     escalations: all.filter((e) => e.ticketKey === ticketKey),
-    // COUNTER is the seeded fallback; once the watcher has run, the real
-    // accounting replaces it.
-    counter: stored.counter ?? COUNTER,
+    counter: stored.counter ?? { checked: 0, auto: 0, escalated: 0 },
     heartbeat: stored.heartbeat ?? null,
     degraded: stored.degraded ?? [],
     budget: stored.budget ?? null,

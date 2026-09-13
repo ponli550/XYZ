@@ -14,6 +14,7 @@
   .caps label { font-weight: 400; margin: 0; display: flex; gap: 6px; align-items: center; }
   button { margin-top: 24px; padding: 7px 14px; font: inherit; border-radius: 6px;
     border: 1px solid #0c66e4; background: #0c66e4; color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: inherit; border-color: #d0d7de; margin-left: 8px; }
   #saved { margin-left: 10px; font-size: 13px; color: #1a7f37; opacity: 0; transition: opacity .2s; }
   #saved.on { opacity: 1; }
 </style>
@@ -42,5 +43,8 @@
 
 <label><input type="checkbox" id="paused"> Pause the agent entirely</label>
 
-<button id="save">Save</button><span id="saved">saved</span>
+<button id="save">Save</button>
+<button id="reset" class="ghost">Reset agent state</button>
+<span id="saved">saved</span>
+<div class="hint">Reset clears findings, the audit log and the counter. Settings are kept.</div>
 <script src="options.js"></script>
