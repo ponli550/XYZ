@@ -33,3 +33,23 @@ export function entry(kind: AuditKind, key: string, detail: string, actor: Audit
 export function append(log: AuditEntry[], e: AuditEntry, cap = 200): AuditEntry[] {
   return [e, ...log].slice(0, cap);
 }
+
+/**
+ * The notified set only ever grew: every id ever surfaced stayed forever, so
+ * storage climbed without bound for as long as the extension was installed.
+ * Keeping the most recent window is enough — its only job is suppressing a
+ * repeat notification for something still on screen.
+ */
+export function boundNotified(ids: string[], cap = 300): string[] {
+  return ids.length <= cap ? ids : ids.slice(-cap);
+}
+
+/** Human-readable one-liner for the rail's activity list. */
+export function describe(e: AuditEntry): string {
+  const verb: Record<AuditKind, string> = {
+    proposed: 'raised', approved: 'approved', dismissed: 'dismissed',
+    wrote: 'wrote to', verified: 'confirmed on', failed: 'failed on',
+    deferred: 'deferred', blocked: 'blocked on',
+  };
+  return `${verb[e.kind]} ${e.key}`;
+}

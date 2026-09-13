@@ -58,7 +58,7 @@ export function ticketKeyFrom(url: string): string | null {
 async function load(ticketKey: string): Promise<RailModel> {
   const stored = await chrome.storage.local.get(
     ['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
-     'capabilities', 'paused']);
+     'capabilities', 'paused', 'auditLog']);
   const all: Escalation[] = stored.escalations ?? [];
   return {
     escalations: all.filter((e) => e.ticketKey === ticketKey),
@@ -68,6 +68,9 @@ async function load(ticketKey: string): Promise<RailModel> {
     budget: stored.budget ?? null,
     capabilities: stored.capabilities ?? [],
     paused: Boolean(stored.paused),
+    // Repo-wide, not filtered to this artifact: the point of an activity log is
+    // seeing what the agent has been doing while you were elsewhere.
+    auditLog: stored.auditLog ?? [],
   };
 }
 
@@ -156,7 +159,7 @@ if (typeof history !== 'undefined' && typeof chrome !== 'undefined') {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
-         'capabilities', 'paused'].some((k) => k in changes)) {
+         'capabilities', 'paused', 'auditLog'].some((k) => k in changes)) {
       void paint();
     }
   });

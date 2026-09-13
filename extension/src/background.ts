@@ -5,7 +5,7 @@ import type { Escalation } from '../../src/core/escalation.ts';
 import { transition } from '../../src/core/escalation.ts';
 import { execute, verifyComment, checkPolicy, DEFAULT_POLICY,
          type Policy, type GitHubConfig } from '../../src/core/github.ts';
-import { entry, append, type AuditEntry } from '../../src/core/audit.ts';
+import { entry, append, boundNotified, type AuditEntry } from '../../src/core/audit.ts';
 import { readRepo } from '../../src/core/sources.ts';
 import { sweep } from '../../src/core/heuristics.ts';
 import { draftEscalation } from '../../src/core/draft.ts';
@@ -218,11 +218,20 @@ async function poll(): Promise<void> {
     });
   }
 
+  for (const id of fresh) {
+    const e = escalations.find((x) => x.id === id);
+    if (e) await audit(entry('proposed', e.ticketKey, e.claim, 'agent'));
+  }
+  if (guard.limited()) {
+    await audit(entry('deferred', '—', `budget limited, ${guard.pending()} parked`, 'agent'));
+  }
+
   await chrome.storage.local.set({
     escalations,
     // A re-opened finding was notified once already; it has to be allowed to
     // notify again, or "it came back" is invisible.
-    notified: [...new Set([...notified.filter((n) => !watched.reopened.includes(n)), ...fresh])],
+    notified: boundNotified(
+      [...new Set([...notified.filter((n) => !watched.reopened.includes(n)), ...fresh])]),
     heartbeat: new Date().toISOString(),
     degraded,
     // The counter is the real accounting, not decoration: checked minus what

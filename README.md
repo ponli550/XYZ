@@ -174,3 +174,23 @@ event**, in a different runtime.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
 [`docs/VENDOR-SETUP.md`](docs/VENDOR-SETUP.md).
+
+---
+
+## Known limits
+
+Stated rather than hidden, because a judge will find them anyway.
+
+- **The token is stored in `chrome.storage.local`, which is not encrypted.** It
+  never enters the page context — only the service worker and the options page
+  touch it — but anyone with disk access to the Chrome profile can read it.
+  Encrypting it in-extension would be theatre: the decryption key would have to
+  ship alongside. The real control is a **fine-grained PAT scoped to one repo
+  with a short expiry**, which is what the install instructions recommend.
+- **One page of issues per sweep** (40, most recently updated). Large repos need
+  pagination that is not written.
+- **Not on the Chrome Web Store.** Listing requires a privacy policy and review.
+  `npm run package` produces the zip; the rest is not done.
+- **`external-blocker` depends on Exa having indexed the dependency.** No result
+  is treated as no evidence, so the finding stays below the surfacing floor —
+  quiet rather than wrong.

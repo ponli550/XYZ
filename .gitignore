@@ -12,3 +12,5 @@ dist/
 dist/
 extension/content.js
 extension/background.js
+
+*.zip

@@ -2,6 +2,7 @@
 // and ours cannot reach GitHub's — a content script that leaks CSS into the host
 // app is the fastest way to look broken on someone else's page.
 import type { Escalation } from '../../src/core/escalation.ts';
+import { describe as describeEntry, type AuditEntry } from '../../src/core/audit.ts';
 
 const CSS = `
 :host { all: initial; }
@@ -53,6 +54,20 @@ button { font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 4px;
 button.primary { background: #0c66e4; border-color: #0c66e4; color: #fff; }
 button:hover { filter: brightness(.97); }
 .empty { padding: 24px 14px; font-size: 12px; opacity: .55; }
+.activity { border-top: 1px solid #dfe1e6; padding: 10px 14px; }
+.activity > summary { font-size: 12px; opacity: .75; }
+.log { margin: 8px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.logrow { display: flex; gap: 7px; font-size: 11px; align-items: baseline; }
+.logtime { flex: 0 0 34px; opacity: .45; font-variant-numeric: tabular-nums; }
+.logkind { flex: 0 0 52px; text-transform: uppercase; font-size: 9px;
+  letter-spacing: .04em; padding-top: 1px; }
+.logkind.blocked, .logkind.failed { color: #ae2e24; }
+.logkind.verified, .logkind.wrote { color: #216e4e; }
+.logkind.deferred { color: #7f5f01; }
+.logwho { opacity: .45; }
+@media (prefers-color-scheme: dark) {
+  .activity { border-top-color: #2c333a; }
+}
 `;
 
 const ago = (iso: string, now = Date.now()): string => {
@@ -74,6 +89,8 @@ export interface RailModel {
   /** What the user has actually granted. The footer must not overstate this. */
   capabilities?: string[];
   paused?: boolean;
+  /** Everything the agent decided, rendered in-page. */
+  auditLog?: AuditEntry[];
 }
 
 export interface RailHandlers {
@@ -202,6 +219,29 @@ export function renderRail(root: ShadowRoot, model: RailModel, h: RailHandlers):
   // switched on. Claiming a power the agent does not have is the same class of
   // bug as drafting a comment that promises a close it cannot perform.
   const caps = model.capabilities ?? [];
+  // The activity log renders here rather than living only in extension storage.
+  // Showing a policy denial used to mean opening DevTools — which is where the
+  // GitHub token is. The safety story should not require exposing the token to
+  // tell it.
+  const log = model.auditLog ?? [];
+  if (log.length) {
+    const act = el('details', 'activity') as HTMLDetailsElement;
+    act.append(el('summary', undefined, `Activity (${log.length})`));
+    const rows = el('div', 'log');
+    for (const e of log.slice(0, 25)) {
+      const row = el('div', 'logrow');
+      row.append(el('span', 'logtime', new Date(e.at).toISOString().slice(11, 16)));
+      row.append(el('span', `logkind ${e.kind}`, e.kind));
+      const body = el('span');
+      body.append(el('span', undefined, describeEntry(e)));
+      if (e.detail) body.append(el('span', 'logwho', ` — ${e.detail.slice(0, 70)}`));
+      row.append(body);
+      rows.append(row);
+    }
+    act.append(rows);
+    rail.append(act);
+  }
+
   rail.append(el('div', 'cap',
     model.paused ? '⏸ paused — the agent will not act'
     : caps.length ? `🔒 can ${caps.join(' · ')} — read-only everywhere else`
