@@ -7,6 +7,16 @@ import { execute, verifyComment, checkPolicy, DEFAULT_POLICY,
          type Policy, type GitHubConfig } from '../../src/core/github.ts';
 import { entry, append, type AuditEntry } from '../../src/core/audit.ts';
 import { FIXTURES } from '../../src/core/fixtures.ts';
+import { readRepo } from '../../src/core/sources.ts';
+import { sweep } from '../../src/core/heuristics.ts';
+import { draftEscalation } from '../../src/core/draft.ts';
+import { merge } from '../../src/core/merge.ts';
+import { BudgetGuard } from '../../src/core/budget.ts';
+import type { Candidate } from '../../src/core/heuristics.ts';
+
+// One guard for the life of the worker. A refusal recorded on one sweep must
+// still be in force on the next, or the budget window means nothing.
+const guard = new BudgetGuard<Candidate>();
 
 const POLL_ALARM = 'sidecar-poll';
 
@@ -22,6 +32,10 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === POLL_ALARM) void poll();
 });
+
+// Sweep once on wake rather than waiting up to two minutes for the first
+// alarm — otherwise a freshly reloaded extension looks dead.
+void poll();
 
 async function settings(): Promise<{ cfg: GitHubConfig; policy: Policy; paused: boolean }> {
   const s = await chrome.storage.local.get(['githubToken', 'repos', 'capabilities', 'paused']);
@@ -108,19 +122,88 @@ async function dismiss(id: string): Promise<void> {
   if (next) await audit(entry('dismissed', next.ticketKey, next.claim, 'human'));
 }
 
+/**
+ * The watcher. Runs on chrome.alarms, so it fires with the browser window
+ * closed — that is the whole ambient claim, and it needs no cloud.
+ *
+ * Order matters and is the budget strategy: read (free) -> deterministic sweep
+ * (free) -> model call ONLY for what survived. Most sweeps spend nothing.
+ */
 async function poll(): Promise<void> {
-  const { escalations = [], notified = [] } =
-    await chrome.storage.local.get(['escalations', 'notified']);
-  const fresh = (escalations as Escalation[])
-    .filter((e) => e.state === 'proposed' && !notified.includes(e.id));
-  if (!fresh.length) return;
-  for (const e of fresh) {
-    chrome.notifications.create(e.id, {
+  const st = await chrome.storage.local.get(
+    ['githubToken', 'openrouterKey', 'model', 'repos', 'capabilities', 'paused',
+     'escalations', 'notified', 'counter', 'viewing']);
+
+  if (st.paused) return;
+  if (!st.githubToken || !st.repos?.length) {
+    await chrome.storage.local.set({ heartbeat: null, degraded: ['not configured'] });
+    return;
+  }
+
+  const degraded: string[] = [];
+  let checked = 0;
+  const candidates: Candidate[] = [];
+
+  for (const spec of st.repos as string[]) {
+    const [owner, repo] = spec.replace('/*', '/').split('/');
+    if (!owner || !repo) continue;
+    const r = await readRepo({ token: st.githubToken }, owner, repo);
+    degraded.push(...r.degraded);
+
+    // The artifact the human currently has open goes first. Scarce model
+    // budget is spent where their attention already is — the reason this
+    // agent lives on the page rather than in a dashboard.
+    const open = st.viewing?.key as string | undefined;
+    const ordered = open
+      ? [...r.snapshots].sort((a, b) => (a.key === open ? -1 : b.key === open ? 1 : 0))
+      : r.snapshots;
+
+    const result = sweep(ordered);
+    checked += result.checked;
+    candidates.push(...result.candidates);
+  }
+
+  // Draft only the candidates above the surfacing floor, and only until the
+  // budget says stop. guarded() parks the rest for replay.
+  const drafted: Escalation[] = [];
+  for (const c of candidates) {
+    const out = await draftEscalation(guard, {
+      apiKey: st.openrouterKey ?? '',
+      model: st.model ?? 'openai/gpt-4o-mini',
+      capabilities: st.capabilities ?? ['comment'],
+    }, c).catch((e) => {
+      degraded.push(`draft ${c.key}: ${e instanceof Error ? e.message : String(e)}`);
+      return { escalation: null, deferred: false };
+    });
+    if (out.escalation) drafted.push(out.escalation);
+  }
+
+  const { escalations, fresh } = merge(st.escalations ?? [], drafted);
+  const notified: string[] = st.notified ?? [];
+
+  for (const id of fresh) {
+    const e = escalations.find((x) => x.id === id);
+    if (!e || notified.includes(id)) continue;
+    chrome.notifications.create(id, {
       type: 'basic', iconUrl: 'icon128.png',
       title: `${e.ticketKey} — ${e.severity}`, message: e.claim,
     });
   }
-  await chrome.storage.local.set({ notified: [...notified, ...fresh.map((e) => e.id)] });
+
+  await chrome.storage.local.set({
+    escalations,
+    notified: [...new Set([...notified, ...fresh])],
+    heartbeat: new Date().toISOString(),
+    degraded,
+    // The counter is the real accounting, not decoration: checked minus what
+    // reached a human is what the restraint claim rests on.
+    counter: {
+      checked: (st.counter?.checked ?? 0) + checked,
+      auto: (st.counter?.auto ?? 0) + (checked - drafted.length),
+      escalated: escalations.filter((e) => e.state === 'proposed').length,
+    },
+    budget: { limited: guard.limited(), until: guard.limitedUntil(), pending: guard.pending() },
+  });
 }
 
 chrome.notifications.onClicked.addListener(async (id) => {
@@ -132,5 +215,6 @@ chrome.notifications.onClicked.addListener(async (id) => {
 chrome.runtime.onMessage.addListener((msg: { type: string; id: string }) => {
   if (msg.type === 'approve') void approve(msg.id);
   if (msg.type === 'dismiss') void dismiss(msg.id);
+  if (msg.type === 'poll') void poll();
   // Fire-and-forget: the rail repaints from storage.onChanged, not from a reply.
 });

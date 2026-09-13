@@ -64,6 +64,10 @@ export interface RailModel {
   escalations: Escalation[];
   counter: { checked: number; auto: number; escalated: number };
   heartbeat: string | null;   // ISO of last successful poll; null = never ran
+  /** Sources that failed this sweep. Shown, never swallowed. */
+  degraded?: string[];
+  /** Budget window, when the model refused. Also shown rather than hidden. */
+  budget?: { limited: boolean; until: number | null; pending: number } | null;
 }
 
 export interface RailHandlers {
@@ -165,6 +169,15 @@ export function renderRail(root: ShadowRoot, model: RailModel, h: RailHandlers):
     model.heartbeat === null ? 'watcher has never run'
       : stale ? `watcher last ran ${ago(model.heartbeat)} — stale`
       : `watching · last poll ${ago(model.heartbeat)}`));
+  if (model.budget?.limited) {
+    const until = model.budget.until
+      ? new Date(model.budget.until).toISOString().slice(11, 16) : '';
+    head.append(el('div', 'beat stale',
+      `budget limited until ${until} — ${model.budget.pending} parked, nothing lost`));
+  }
+  for (const d of model.degraded ?? []) {
+    head.append(el('div', 'beat stale', `degraded — ${d}`));
+  }
   rail.append(head);
 
   const live = model.escalations.filter((e) => e.state !== 'verified');

@@ -53,14 +53,17 @@ export function ticketKeyFrom(url: string): string | null {
 }
 
 async function load(ticketKey: string): Promise<RailModel> {
-  // #7 replaces this with a Trigger.dev public-token read. Until then the
-  // fixtures render so the overlay can be built and demoed independently.
-  const stored = await chrome.storage.local.get(['escalations', 'heartbeat']);
+  const stored = await chrome.storage.local.get(
+    ['escalations', 'heartbeat', 'counter', 'degraded', 'budget']);
   const all: Escalation[] = stored.escalations ?? FIXTURES;
   return {
     escalations: all.filter((e) => e.ticketKey === ticketKey),
-    counter: COUNTER,
+    // COUNTER is the seeded fallback; once the watcher has run, the real
+    // accounting replaces it.
+    counter: stored.counter ?? COUNTER,
     heartbeat: stored.heartbeat ?? null,
+    degraded: stored.degraded ?? [],
+    budget: stored.budget ?? null,
   };
 }
 
@@ -124,6 +127,9 @@ if (typeof history !== 'undefined' && typeof chrome !== 'undefined') {
   // A republished escalation (watcher found something while this tab was open)
   // repaints in place rather than waiting for the next navigation.
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && ('escalations' in changes || 'heartbeat' in changes)) void paint();
+    if (area !== 'local') return;
+    if (['escalations', 'heartbeat', 'counter', 'degraded', 'budget'].some((k) => k in changes)) {
+      void paint();
+    }
   });
 }
