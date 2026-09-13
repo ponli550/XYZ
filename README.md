@@ -43,12 +43,16 @@ to care about.
 
 | | |
 |---|---|
-| **Watches** | `chrome.alarms` fires every 2 min — with the browser window closed |
+| **Watches** | `chrome.alarms` fires every 2 min while Chrome is running — even with the browser window closed |
 | **Detects** | deterministic rules over issues, PRs and their links. Zero tokens |
 | **Drafts** | one small model call, only for candidates that already passed a rule |
 | **Surfaces** | a card on the issue page, with evidence, timestamps and a timeline |
 | **Acts** | on your approval only, and only via two verbs |
 | **Remembers** | a dismissal is parked with a condition, not deleted |
+
+A Trigger.dev cron is the primary cloud watcher: it drafts findings and writes
+them to the Worker store. The Worker's hourly cron is the fallback and can also
+draft; the extension drafts locally only when no Worker is configured.
 
 A real finding, on this repo:
 
@@ -69,7 +73,7 @@ The issue is still open despite the related pull request being merged.
 ## Architecture
 
 ```
-chrome.alarms  (fires with the window closed)
+chrome.alarms  (local path; drafts when no Worker is configured)
       │
       ▼
  readRepo()            GitHub REST, read-only              free
@@ -147,7 +151,7 @@ Open any issue in an allowed repo. The rail appears on the right.
 ## Tests
 
 ```bash
-npm test        # 82 tests, node:test, no network
+npm test        # 112 tests, node:test, no network
 npm run typecheck
 ```
 
@@ -202,15 +206,19 @@ Stated rather than hidden, because a judge will find them anyway.
 ## Optional: the cloud watcher
 
 `chrome.alarms` only fires while Chrome is running, so the extension's own sweep
-stops when you close the lid. `worker/` is a Cloudflare Worker that runs the
-**same core modules** on a cron trigger, so the agent keeps finding things while
-nothing of yours is on.
+stops when you close the lid. Trigger.dev is the primary cloud schedule and
+writes its drafts to `worker/`, a Cloudflare Worker that is the shared store and
+has an hourly fallback sweep if Trigger.dev is down. The Worker accepts
+authenticated `POST /state` from the primary sweep and `POST /sweep` to force a
+fallback sweep.
 
 It is deliberately **not** a token proxy. It holds its own credential, never sees
 your browser's, and is read-only to the extension — it finds, it never writes.
-Escalation ids are `key:rule`, so a finding derived by either watcher is the same
 card: merging two independent sweeps is idempotent by construction, and the
 merge still refuses to overwrite anything you decided.
+Escalation ids are `key:rule`, so a finding derived by any watcher is the same
+card: merging independent sweeps is idempotent by construction, and the merge
+still refuses to overwrite anything you decided.
 
 ```bash
 cd worker
@@ -234,5 +242,5 @@ curl -H "x-sidecar-key: $READ_KEY" https://<worker>/state
 curl -X POST -H "x-sidecar-key: $READ_KEY" https://<worker>/sweep
 ```
 
-`/sweep` changes nothing about the ambient claim — the cron still runs on its
-own. It just removes ten minutes of dead air when testing.
+`/sweep` changes nothing about the ambient claim — the scheduled watchers still
+run on their own. It just removes the wait when testing.

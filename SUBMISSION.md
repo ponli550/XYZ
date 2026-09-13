@@ -5,8 +5,8 @@
 Repo: <https://github.com/ponli550/XYZ> · Demo: [https://youtu.be/J8KygnKkwAc](https://youtu.be/J8KygnKkwAc) (2 min 13 s) · Built 12–13 September 2026
 
 > **Issues #5 and #17 are left open on purpose** — they are the two live findings
-> the agent raises in the demo. Closing either makes its card retire, which is
-> the retirement rule working, not a bug.
+> the agent raises in the demo. Closing either makes its card retire on a clean
+> sweep, which is the retirement rule working, not a bug.
 
 ---
 
@@ -46,16 +46,16 @@ neither is reproducible in a chat window:
    budget is spent where you are already looking. The page is not where the
    agent displays — it is how the agent knows what to care about.
 
-It also needs **zero integration**. It inherits your existing GitHub session, so
-it works on any repo you can already see, private ones included, with no OAuth
-flow and no deployment. Sentra needs an enterprise rollout against your org.
+It needs no OAuth flow or deployment. A configured GitHub token reads the repos
+you allow, including private ones it can access. Sentra needs an enterprise
+rollout against your org.
 
 ## How it works
 
 ```
-Trigger.dev cron ──┐
-Cloudflare cron ───┼──► readRepo()        GitHub REST, read-only        free
-chrome.alarms ─────┘         │
+Trigger.dev cron (primary; drafts) ──┐
+Cloudflare cron (hourly fallback; drafts) ──┼──► readRepo()  GitHub REST, read-only  free
+chrome.alarms (local drafts without Worker) ─┘     │
                              ▼
                         sweep()           deterministic rules           free   ← 87.5% stop here
                              │
@@ -99,21 +99,21 @@ inflate confidence. Progress theatre is a bug.
 
 **A dismissal is parked, not deleted** — it carries a condition. If the condition
 fires the card returns; if it expires the card stays gone, because the human was
-right. **And a finding that stops being true is retired**, so a stale card cannot
-outlive its cause.
+right. **And a finding that stops being true is retired on a clean sweep**, so a
+stale card cannot outlive its cause while a degraded sweep cannot erase it.
 
 ## Sponsor tools, each doing something the others cannot
 
 | | Role |
 |---|---|
-| **Trigger.dev** | the scheduled sweep — retried per step, with a run history you can point at: *"here is the run that fired at 05:30, unattended"* |
-| **Cloudflare** | the shared store the sweep writes and the extension reads, plus an hourly fallback sweep so the store can refill itself |
-| **OpenRouter** | drafts every claim and every proposed comment |
-| **Exa** | the only source reaching outside the org — found that `@trigger.dev/sdk` v4.5.16 shipped before the issue claiming to be blocked on it was filed |
+| **Trigger.dev** | the primary scheduled sweep — it drafts, retries per step, and has a run history you can point at: *"here is the run that fired at 05:30, unattended"* |
+| **Cloudflare** | the shared store the primary sweep writes and the extension reads, plus an hourly fallback sweep that can draft and refill the store itself |
+| **OpenRouter** | drafts candidates that survive the deterministic rules |
+| **Exa** | the only source reaching outside the org — searches a 180-day window and keeps releases from before or after the issue was filed |
 
 ## Built during the event
 
-28 commits, 11 core modules, **112 tests**, typechecked across three projects.
+31 commits, 11 core modules, **112 tests**, typechecked across three projects.
 
 The architecture is derived from a Bitbucket PR-watcher daemon run in production
 — disposable per-event runs, escalation-as-artifact, one narrow write capability,
