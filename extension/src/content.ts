@@ -55,13 +55,43 @@ export function ticketKeyFrom(url: string): string | null {
   return m ? `${m[1]}/${m[2]}#${m[3]}` : null;
 }
 
-async function load(ticketKey: string): Promise<RailModel> {
+/** Reserved first path segments that are GitHub's own, not an account. */
+const NOT_OWNERS = new Set([
+  'settings', 'notifications', 'explore', 'marketplace', 'pulls', 'issues',
+  'codespaces', 'sponsors', 'organizations', 'new', 'login', 'logout', 'about',
+  'apps', 'topics', 'trending', 'collections', 'events', 'security', 'search',
+  'dashboard', 'stars', 'watching', 'account', 'orgs',
+]);
+
+/**
+ * "owner/repo" for any page inside a repository — the root, code, issues list,
+ * actions, settings. Without this the agent only existed on a single issue,
+ * which is the one place you have already found the problem.
+ */
+export function repoFrom(url: string): string | null {
+  const seg = new URL(url, 'https://x.invalid').pathname.split('/').filter(Boolean);
+  if (seg.length < 2) return null;
+  if (NOT_OWNERS.has(seg[0]!.toLowerCase())) return null;
+  return `${seg[0]}/${seg[1]}`;
+}
+
+/** Everything on this repo, for the repo-level view. */
+function scopeToRepo(all: Escalation[], repo: string): Escalation[] {
+  return all.filter((e) => e.ticketKey.split('#')[0] === repo);
+}
+
+async function load(ticketKey: string | null, repo: string | null): Promise<RailModel> {
   const stored = await chrome.storage.local.get(
     ['escalations', 'heartbeat', 'counter', 'degraded', 'budget',
      'capabilities', 'paused', 'auditLog']);
   const all: Escalation[] = stored.escalations ?? [];
   return {
-    escalations: all.filter((e) => e.ticketKey === ticketKey),
+    // On an artifact: just that artifact. Anywhere else in the repo: the whole
+    // repo, so opening the repo at all tells you whether anything needs you.
+    escalations: ticketKey
+      ? all.filter((e) => e.ticketKey === ticketKey)
+      : repo ? scopeToRepo(all, repo) : [],
+    scope: ticketKey ? 'artifact' : 'repo',
     counter: stored.counter ?? { checked: 0, auto: 0, escalated: 0 },
     heartbeat: stored.heartbeat ?? null,
     degraded: stored.degraded ?? [],
@@ -76,7 +106,11 @@ async function load(ticketKey: string): Promise<RailModel> {
 
 async function paint(): Promise<void> {
   const key = ticketKeyFrom(location.href);
-  if (!key) {
+  const repo = repoFrom(location.href);
+
+  // Off GitHub's repo pages entirely — a profile, notifications, settings.
+  // Nothing to say, so say nothing and take no space.
+  if (!key && !repo) {
     document.getElementById(HOST_ID)?.remove();
     reserveGutter(false);
     shadow = null;
@@ -87,10 +121,12 @@ async function paint(): Promise<void> {
   // What the human is looking at, right now. Published so the watcher can
   // prioritise the open artifact over everything else in its queue — that
   // prioritisation is the whole reason the agent lives on the page.
-  const ctx = extract(document, key, location.pathname.includes('/pull/') ? 'pull' : 'issue');
-  void chrome.storage.local.set({ viewing: { ...ctx, completeness: completeness(ctx) } });
+  if (key) {
+    const ctx = extract(document, key, location.pathname.includes('/pull/') ? 'pull' : 'issue');
+    void chrome.storage.local.set({ viewing: { ...ctx, completeness: completeness(ctx) } });
+  }
 
-  const model = await load(key);
+  const model = await load(key, repo);
   const waiting = model.escalations.filter((e) => e.state === 'proposed').length;
 
   // Collapsed, the agent is a presence on the page rather than a panel beside
@@ -118,6 +154,10 @@ async function paint(): Promise<void> {
     onApprove: (id) => chrome.runtime.sendMessage({ type: 'approve', id }),
     onDismiss: (id) => chrome.runtime.sendMessage({ type: 'dismiss', id }),
     onCollapse: () => { expanded = false; void paint(); },
+    // From the repo view a card is a signpost, not a control: go to the thing.
+    onOpenTicket: (ticketKey) => {
+      location.href = `https://github.com/${ticketKey.replace('#', '/issues/')}`;
+    },
   });
 }
 

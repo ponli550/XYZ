@@ -7,13 +7,14 @@
     "build": "npm run build:content && npm run build:sw && npm run build:options",
     "watch": "npm run build -- --watch",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts' 'extension/src/*.test.ts'",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "build:content": "esbuild extension/src/content.ts --bundle --format=iife --outfile=extension/content.js --log-level=warning",
     "build:sw": "esbuild extension/src/background.ts --bundle --format=esm --outfile=extension/background.js --log-level=warning",
     "build:options": "esbuild extension/src/options.ts --bundle --format=iife --outfile=extension/options.js --log-level=warning",
     "package": "npm run build && cd extension && zip -qr ../sidecar-$npm_package_version.zip . -x 'src/*' && echo packaged sidecar-$npm_package_version.zip"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
     "@types/chrome": "^0.0.287",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^24.0.0",

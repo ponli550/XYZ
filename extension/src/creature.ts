@@ -162,7 +162,7 @@ export function renderCreature(root: ShadowRoot, st: CreatureState, h: CreatureH
   let f = 0;
   const timer = setInterval(() => {
     f = 1 - f;
-    art.textContent = frames[f];
+    art.textContent = frames[f] ?? frames[0];
   }, st.mood === 'found' ? 600 : 2400);
   // The root is replaced wholesale on every repaint, so the interval has to be
   // released with the node it animates or they accumulate one per repaint.

@@ -91,12 +91,15 @@ export interface RailModel {
   paused?: boolean;
   /** Everything the agent decided, rendered in-page. */
   auditLog?: AuditEntry[];
+  /** 'artifact' on an issue or PR; 'repo' anywhere else inside a repository. */
+  scope?: 'artifact' | 'repo';
 }
 
 export interface RailHandlers {
   onApprove(id: string): void;
   onDismiss(id: string): void;
   onCollapse(): void;
+  onOpenTicket(ticketKey: string): void;
 }
 
 const el = (tag: string, cls?: string, text?: string): HTMLElement => {
@@ -110,12 +113,13 @@ const el = (tag: string, cls?: string, text?: string): HTMLElement => {
 // dead loop are indistinguishable unless you render the clock.
 const STALE_AFTER_MS = 6 * 60 * 1000;
 
-function renderCard(e: Escalation, h: RailHandlers): HTMLElement {
+function renderCard(e: Escalation, h: RailHandlers, scope: 'artifact' | 'repo'): HTMLElement {
   const card = el('div', 'card');
 
   const top = el('div', 'top');
   top.append(el('span', `chip ${e.severity}`, e.severity));
-  top.append(el('span', undefined, e.ticketKey));
+  const keyEl = el('span', undefined, e.ticketKey);
+  top.append(keyEl);
   top.append(el('span', 'conf', `${Math.round(e.confidence * 100)}%`));
   card.append(top);
 
@@ -154,6 +158,18 @@ function renderCard(e: Escalation, h: RailHandlers): HTMLElement {
 
   if (e.watch) {
     card.append(el('div', 'when', `Parked — ${e.watch.condition}`));
+  }
+
+  // From the repo view a card is a signpost: the action belongs on the artifact
+  // it is about, where the human can see the thing before approving a change
+  // to it. Approving blind from a list is how an agent gets rubber-stamped.
+  if (scope === 'repo') {
+    const go = el('button', undefined, `Open ${e.ticketKey.split('#')[1] ? '#' + e.ticketKey.split('#')[1] : ''}`) as HTMLButtonElement;
+    go.addEventListener('click', () => h.onOpenTicket(e.ticketKey));
+    const acts = el('div', 'acts');
+    acts.append(go);
+    card.append(acts);
+    return card;
   }
 
   if (e.proposal) {
@@ -211,9 +227,11 @@ export function renderRail(root: ShadowRoot, model: RailModel, h: RailHandlers):
 
   const live = model.escalations.filter((e) => e.state !== 'verified');
   if (!live.length) {
-    rail.append(el('div', 'empty', 'Nothing to raise on this ticket.'));
+    rail.append(el('div', 'empty', model.scope === 'repo'
+      ? 'Nothing to raise anywhere in this repo.'
+      : 'Nothing to raise on this issue.'));
   }
-  for (const e of live) rail.append(renderCard(e, h));
+  for (const e of live) rail.append(renderCard(e, h, model.scope ?? 'artifact'));
 
   // The footer stated "can comment · transition" regardless of what was
   // switched on. Claiming a power the agent does not have is the same class of
