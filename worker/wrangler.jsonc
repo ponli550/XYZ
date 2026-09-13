@@ -1,23 +1,32 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sidecar-watcher",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-09-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
-
-  // Every 10 minutes. The extension's own alarm is faster when Chrome is open;
-  // this exists for when it is not.
-  "triggers": { "crons": ["*/10 * * * *"] },
-
-  "kv_namespaces": [
-    { "binding": "SIDECAR", "id": "REPLACE_WITH_KV_ID" }
-  ],
-
-  "vars": {
-    "REPOS": "ponli550/XYZ",
-    "MODEL": "openai/gpt-4o-mini"
-  }
-  // Secrets, set with `wrangler secret put`:
-  //   GITHUB_TOKEN  OPENROUTER_KEY  EXA_KEY  READ_KEY
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sidecar-watcher",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	// Every 10 minutes. The extension's own alarm is faster when Chrome is open;
+	// this exists for when it is not.
+	"triggers": {
+		"crons": [
+			"*/10 * * * *"
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SIDECAR",
+			"id": "373469b13c12409881e4c161f5758057",
+			"remote": true
+		}
+	],
+	"vars": {
+		"REPOS": "ponli550/XYZ",
+		"MODEL": "openai/gpt-4o-mini"
+	}
+	// Secrets, set with `wrangler secret put`:
+	//   GITHUB_TOKEN  OPENROUTER_KEY  EXA_KEY  READ_KEY
 }

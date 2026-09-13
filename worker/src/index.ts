@@ -117,13 +117,22 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
-    // The Worker is READ-ONLY to the extension. It never accepts a write and
-    // never hands back a credential — it holds no user token, only its own.
-    if (url.pathname !== '/state' || req.method !== 'GET') {
-      return new Response('not found', { status: 404 });
-    }
+    // The Worker is READ-ONLY to GitHub. It never writes to a repo and never
+    // hands back a credential — it holds its own token, never the browser's.
     if (req.headers.get('x-sidecar-key') !== env.READ_KEY) {
       return new Response('unauthorized', { status: 401 });
+    }
+
+    // Forces a sweep now instead of waiting for the next cron tick. It changes
+    // nothing about the ambient claim — the cron still runs on its own — it
+    // just removes ten minutes of dead air when you are testing or demoing.
+    if (url.pathname === '/sweep' && req.method === 'POST') {
+      const state = await runSweep(env);
+      return Response.json(state, { headers: { 'cache-control': 'no-store' } });
+    }
+
+    if (url.pathname !== '/state' || req.method !== 'GET') {
+      return new Response('not found', { status: 404 });
     }
 
     const state = await load(env);

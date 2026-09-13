@@ -173,3 +173,13 @@ test('a failing checks lookup degrades that PR only', async () => {
   assert.equal(r.snapshots[0]!.ci, null);
   assert.match(r.degraded[0]!, /checks 16/);
 });
+
+test('every GitHub request carries a User-Agent — without one GitHub 403s', async () => {
+  let headers: Record<string, string> = {};
+  globalThis.fetch = (async (_u: string, init: RequestInit) => {
+    headers = init.headers as Record<string, string>;
+    return { ok: true, json: async () => [] };
+  }) as unknown as typeof fetch;
+  await readRepo(cfg, 'o', 'r');
+  assert.ok(headers['User-Agent'], 'curl and Chrome add one; a Worker does not');
+});

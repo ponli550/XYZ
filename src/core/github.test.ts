@@ -83,3 +83,13 @@ test('a GitHub error surfaces as an error, never as a silent success', async () 
   })) as unknown as typeof fetch;
   await assert.rejects(() => comment(cfg, 'ponli550/XYZ#5', 'hi'), /github 403/);
 });
+
+test('writes carry a User-Agent too', async () => {
+  let headers: Record<string, string> = {};
+  globalThis.fetch = (async (_u: string, init: RequestInit) => {
+    headers = init.headers as Record<string, string>;
+    return { ok: true, json: async () => ({ html_url: 'u' }), text: async () => '' };
+  }) as unknown as typeof fetch;
+  await comment(cfg, 'ponli550/XYZ#5', 'hi');
+  assert.ok(headers['User-Agent']);
+});

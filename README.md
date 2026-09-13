@@ -223,3 +223,14 @@ npx wrangler deploy
 Then paste the deployed URL and the same `READ_KEY` into the extension's options.
 Leave both blank and the extension works exactly as before — the Worker is an
 upgrade, never a dependency.
+
+```bash
+# read what it has found
+curl -H "x-sidecar-key: $READ_KEY" https://<worker>/state
+
+# force a sweep instead of waiting for the next cron tick
+curl -X POST -H "x-sidecar-key: $READ_KEY" https://<worker>/sweep
+```
+
+`/sweep` changes nothing about the ambient claim — the cron still runs on its
+own. It just removes ten minutes of dead air when testing.
