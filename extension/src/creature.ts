@@ -8,6 +8,8 @@
 // array, and pointer events. A content script that ships a 3D engine to draw
 // characters would be absurd, and it would cost every GitHub page you open.
 
+import { TOKENS } from './tokens.ts';
+
 export type Mood = 'watching' | 'thinking' | 'found' | 'limited' | 'paused';
 
 /** Two frames per mood. Anything more reads as fidgeting rather than breathing. */
@@ -74,26 +76,28 @@ const LABEL: Record<Mood, string> = {
 
 export const CREATURE_CSS = `
 .creature {
+  ${TOKENS}
   position: fixed; z-index: 2147483000; cursor: grab;
   font: 11px/1.05 ui-monospace, SFMono-Regular, Menlo, monospace;
-  white-space: pre; user-select: none; padding: 8px 10px;
-  background: #fff; color: #1f2328;
-  border: 1px solid #d0d7de; border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(31,35,40,.12);
-  transition: box-shadow .12s, transform .12s;
+  white-space: pre; user-select: none;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  background: var(--ds-surface); color: var(--ds-ink);
+  border: 1px solid var(--ds-line); border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-2);
+  transition: box-shadow .14s, transform .14s;
 }
-.creature:hover { box-shadow: 0 4px 16px rgba(31,35,40,.2); transform: translateY(-1px); }
+.creature:hover { box-shadow: var(--ds-shadow-3); transform: translateY(-1px); }
 .creature.dragging { cursor: grabbing; transition: none; }
 .creature .badge {
-  position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px;
-  border-radius: 8px; background: #cf222e; color: #fff;
-  font: 600 10px/16px -apple-system, sans-serif; text-align: center; padding: 0 4px;
+  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px;
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-accent); color: var(--ds-accent-ink);
+  font: 600 10px/18px var(--ds-font); text-align: center; padding: 0 5px;
+  box-shadow: var(--ds-shadow-1);
 }
-.creature .cap { display: block; margin-top: 4px; font-size: 9px; opacity: .5;
-  font-family: -apple-system, sans-serif; letter-spacing: .02em; }
-@media (prefers-color-scheme: dark) {
-  .creature { background: #22272b; color: #c7d1db; border-color: #2c333a; }
-}
+.creature .cap { display: block; margin-top: var(--ds-space-2);
+  font-family: var(--ds-font-display); font-size: 10px;
+  color: var(--ds-ink-muted); letter-spacing: .01em; }
 @media (prefers-reduced-motion: reduce) { .creature { transition: none; } }
 `;
 
