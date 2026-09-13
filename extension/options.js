@@ -2,11 +2,20 @@
 (() => {
   // extension/src/options.ts
   var $ = (id) => document.getElementById(id);
-  var KEYS = ["githubToken", "openrouterKey", "model", "repos", "capabilities", "paused"];
+  var KEYS = [
+    "githubToken",
+    "openrouterKey",
+    "exaKey",
+    "model",
+    "repos",
+    "capabilities",
+    "paused"
+  ];
   async function restore() {
     const s = await chrome.storage.local.get([...KEYS]);
     $("gh").value = s.githubToken ?? "";
     $("or").value = s.openrouterKey ?? "";
+    $("exa").value = s.exaKey ?? "";
     $("model").value = s.model ?? "openai/gpt-4o-mini";
     $("repos").value = (s.repos ?? []).join(", ");
     const caps = s.capabilities ?? [];
@@ -22,6 +31,7 @@
     await chrome.storage.local.set({
       githubToken: $("gh").value.trim(),
       openrouterKey: $("or").value.trim(),
+      exaKey: $("exa").value.trim(),
       model: $("model").value.trim() || "openai/gpt-4o-mini",
       repos: $("repos").value.split(",").map((r) => r.trim()).filter(Boolean),
       capabilities,

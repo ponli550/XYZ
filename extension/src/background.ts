@@ -13,6 +13,7 @@ import { merge } from '../../src/core/merge.ts';
 import { evaluateWatches } from '../../src/core/watch.ts';
 import type { Snapshot } from '../../src/core/heuristics.ts';
 import { BudgetGuard } from '../../src/core/budget.ts';
+import { releaseEvidence } from '../../src/core/exa.ts';
 import type { Candidate } from '../../src/core/heuristics.ts';
 
 // One guard for the life of the worker. A refusal recorded on one sweep must
@@ -130,8 +131,8 @@ async function dismiss(id: string): Promise<void> {
  */
 async function poll(): Promise<void> {
   const st = await chrome.storage.local.get(
-    ['githubToken', 'openrouterKey', 'model', 'repos', 'capabilities', 'paused',
-     'escalations', 'notified', 'counter', 'viewing']);
+    ['githubToken', 'openrouterKey', 'exaKey', 'model', 'repos', 'capabilities',
+     'paused', 'escalations', 'notified', 'counter', 'viewing']);
 
   if (st.paused) return;
   if (!st.githubToken || !st.repos?.length) {
@@ -168,6 +169,25 @@ async function poll(): Promise<void> {
   // its claim and proposal, so it costs nothing to bring back. Free, and it is
   // the moment that reads as the agent having remembered.
   const watched = evaluateWatches((st.escalations ?? []) as Escalation[], allSnapshots);
+
+  // An external-blocker candidate is a single weak signal: the issue SAYS it is
+  // blocked on something. Exa supplies the other half — whether that something
+  // has since shipped. Without it the candidate stays below the surfacing floor
+  // and the human never sees it, which is the correct outcome, not a bug.
+  if (st.exaKey) {
+    for (const c of candidates) {
+      if (c.severity !== 'external') continue;
+      const snap = allSnapshots.find((s2) => s2.key === c.key);
+      const dep = snap?.externalDeps[0];
+      if (!dep) continue;
+      try {
+        const ev = await releaseEvidence({ apiKey: st.exaKey }, dep, snap!.createdAt);
+        if (ev) { c.evidence.push(ev); c.prior = Math.max(c.prior, 0.7); }
+      } catch (e) {
+        degraded.push(`exa ${dep}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
 
   // Draft only the candidates above the surfacing floor, and only until the
   // budget says stop. guarded() parks the rest for replay.
