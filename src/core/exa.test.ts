@@ -10,18 +10,35 @@ const reply = (results: unknown[]) => {
   globalThis.fetch = (async () => ({ ok: true, json: async () => ({ results }) })) as unknown as typeof fetch;
 };
 
-test('a release AFTER the claim becomes evidence', async () => {
-  reply([{ url: 'https://x/rel', title: 'lib-x 2.4.1', summary: 'fixes token refresh race',
+test('a dated release becomes evidence', async () => {
+  reply([{ url: 'https://x/rel', title: 'lib-x 2.4.1 fixes token refresh race',
            publishedDate: '2026-09-04T00:00:00Z' }]);
   const s = await releaseEvidence(cfg, 'lib-x', SINCE, NOW);
   assert.equal(s!.system, 'exa');
   assert.equal(s!.at, '2026-09-04T00:00:00Z');
   assert.match(s!.excerpt, /token refresh/);
+  assert.equal(s!.url, 'https://x/rel');
 });
 
-test('a release that PREDATES the claim proves nothing', async () => {
-  reply([{ url: 'https://x/old', summary: 'old release', publishedDate: '2026-08-01T00:00:00Z' }]);
-  assert.equal(await releaseEvidence(cfg, 'lib-x', SINCE, NOW), null);
+test('predating releases are kept and labelled, not discarded', async () => {
+  reply([{ url: 'https://x/old', title: 'lib-x 2.4.1', publishedDate: '2026-08-01T00:00:00Z' }]);
+  const s = await releaseEvidence(cfg, 'lib-x', SINCE, NOW);
+  assert.match(s!.excerpt, /already shipped before this was filed/);
+});
+
+test('a release after the claim is labelled the other way', async () => {
+  reply([{ url: 'https://x/new', title: 'lib-x 2.5.0', publishedDate: '2026-09-04T00:00:00Z' }]);
+  const s = await releaseEvidence(cfg, 'lib-x', SINCE, NOW);
+  assert.match(s!.excerpt, /shipped since this was filed/);
+});
+
+test('the most recent dated result wins', async () => {
+  reply([
+    { url: 'https://x/a', title: 'old', publishedDate: '2026-06-01T00:00:00Z' },
+    { url: 'https://x/b', title: 'newer', publishedDate: '2026-08-20T00:00:00Z' },
+  ]);
+  const s = await releaseEvidence(cfg, 'lib-x', SINCE, NOW);
+  assert.equal(s!.url, 'https://x/b');
 });
 
 test('an undated result is dropped rather than guessed', async () => {
@@ -42,7 +59,7 @@ test('the search window starts at the claim, not at the epoch', async () => {
     return { ok: true, json: async () => ({ results: [] }) };
   }) as unknown as typeof fetch;
   await releaseEvidence(cfg, 'lib-x', SINCE, NOW);
-  assert.match(sent, /"startPublishedDate":"2026-09-01/);
+  assert.match(sent, /"startPublishedDate":"2026-03-/, 'a 180-day window, not the issue date');
   assert.match(sent, /lib-x release notes changelog fix/);
 });
 

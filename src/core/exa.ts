@@ -30,16 +30,22 @@ interface ExaResult {
  * release, and the candidate then stays a weak single-source signal below the
  * surfacing floor. Inventing evidence to reach the threshold would be the worst
  * bug this codebase could have.
+ *
+ * The window deliberately does NOT start at the issue's own date. The first
+ * version of this required the release to POSTDATE the claim, which is
+ * backwards: a release that predates it is the more damning finding — you filed
+ * this saying you were blocked, and it had already shipped. The relationship is
+ * recorded in the excerpt so the draft can say which case it is, rather than
+ * being used to discard the evidence.
  */
 export async function releaseEvidence(
   cfg: ExaConfig,
   dep: string,
   since: string,
   now = new Date(),
+  windowDays = 180,
 ): Promise<Source | null> {
-  // Only look at the window since the issue claimed to be blocked. A release
-  // that predates the claim proves nothing about it.
-  const from = new Date(Math.max(Date.parse(since), now.getTime() - 180 * 86_400_000));
+  const from = new Date(now.getTime() - windowDays * 86_400_000);
 
   const res = await fetch(`${cfg.baseUrl ?? 'https://api.exa.ai'}/search`, {
     method: 'POST',
@@ -58,18 +64,27 @@ export async function releaseEvidence(
   }
 
   const body = await res.json() as { results?: ExaResult[] };
-  const hit = (body.results ?? []).find((r) => r.url && (r.summary || r.title));
-  if (!hit) return null;
 
   // A result with no publish date cannot be placed on the timeline, and the
-  // timeline is the argument. Drop it rather than guess a date.
-  if (!hit.publishedDate) return null;
-  if (Date.parse(hit.publishedDate) <= Date.parse(since)) return null;
+  // timeline is the argument — so undated results are skipped, not dated by
+  // guess. Take the most recent of what remains.
+  const dated = (body.results ?? [])
+    .filter((r) => r.url && r.publishedDate && (r.summary || r.title))
+    .sort((a, b) => Date.parse(b.publishedDate!) - Date.parse(a.publishedDate!));
+
+  const hit = dated[0];
+  if (!hit) return null;
+
+  const claimed = Date.parse(since);
+  const shipped = Date.parse(hit.publishedDate!);
+  const relation = shipped <= claimed
+    ? 'already shipped before this was filed'
+    : 'shipped since this was filed';
 
   return {
     system: 'exa',
     url: hit.url!,
-    excerpt: (hit.summary ?? hit.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 160),
-    at: hit.publishedDate,
+    excerpt: `${(hit.title ?? hit.summary ?? '').replace(/\s+/g, ' ').trim().slice(0, 110)} — ${relation}`,
+    at: hit.publishedDate!,
   };
 }
