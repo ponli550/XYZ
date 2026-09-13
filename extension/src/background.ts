@@ -175,7 +175,7 @@ async function poll(): Promise<void> {
   // blocked on something. Exa supplies the other half — whether that something
   // has since shipped. Without it the candidate stays below the surfacing floor
   // and the human never sees it, which is the correct outcome, not a bug.
-  if (st.exaKey) {
+  if (st.exaKey && !(st.workerUrl && st.workerKey)) {
     for (const c of candidates) {
       if (c.severity !== 'external') continue;
       const snap = allSnapshots.find((s2) => s2.key === c.key);
@@ -190,10 +190,15 @@ async function poll(): Promise<void> {
     }
   }
 
-  // Draft only the candidates above the surfacing floor, and only until the
-  // budget says stop. guarded() parks the rest for replay.
+  // When a cloud watcher is configured it does the drafting, so the extension
+  // does not need an OpenRouter or Exa key at all — and a key you do not need
+  // is a key you should not be storing. The local sweep still runs: it is what
+  // prioritises the artifact you have open, and it is what keeps working when
+  // the Worker is unreachable.
+  const delegated = Boolean(st.workerUrl && st.workerKey);
+
   const drafted: Escalation[] = [];
-  for (const c of candidates) {
+  for (const c of delegated ? [] : candidates) {
     const out = await draftEscalation(guard, {
       apiKey: st.openrouterKey ?? '',
       model: st.model ?? 'openai/gpt-4o-mini',
@@ -257,7 +262,7 @@ async function poll(): Promise<void> {
     // reached a human is what the restraint claim rests on.
     counter: {
       checked: (st.counter?.checked ?? 0) + checked,
-      auto: (st.counter?.auto ?? 0) + (checked - drafted.length),
+      auto: (st.counter?.auto ?? 0) + (checked - drafted.length - remote.length),
       escalated: escalations.filter((e) => e.state === 'proposed').length,
     },
     budget: { limited: guard.limited(), until: guard.limitedUntil(), pending: guard.pending() },
