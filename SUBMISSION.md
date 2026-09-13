@@ -2,7 +2,11 @@
 
 **An agent that is already on the issue when you open it.**
 
-Repo: <https://github.com/ponli550/XYZ> · Built 12–13 September 2026
+Repo: <https://github.com/ponli550/XYZ> · Demo: 2 min 13 s · Built 12–13 September 2026
+
+> **Issues #5 and #17 are left open on purpose** — they are the two live findings
+> the agent raises in the demo. Closing either makes its card retire, which is
+> the retirement rule working, not a bug.
 
 ---
 
