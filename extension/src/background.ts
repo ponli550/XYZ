@@ -132,7 +132,8 @@ async function dismiss(id: string): Promise<void> {
 async function poll(): Promise<void> {
   const st = await chrome.storage.local.get(
     ['githubToken', 'openrouterKey', 'exaKey', 'model', 'repos', 'capabilities',
-     'paused', 'escalations', 'notified', 'counter', 'viewing']);
+     'paused', 'escalations', 'notified', 'counter', 'viewing',
+     'workerUrl', 'workerKey']);
 
   if (st.paused) return;
   if (!st.githubToken || !st.repos?.length) {
@@ -204,7 +205,25 @@ async function poll(): Promise<void> {
     if (out.escalation) drafted.push(out.escalation);
   }
 
-  const { escalations, fresh } = merge(watched.escalations, drafted);
+  // Findings from the Worker, which kept sweeping while Chrome was closed.
+  // Escalation ids are `key:rule`, so a finding either side derived is the SAME
+  // card — merging two independent sweeps is idempotent by construction, and
+  // merge() still refuses to overwrite anything the human decided.
+  let remote: Escalation[] = [];
+  if (st.workerUrl && st.workerKey) {
+    try {
+      const res = await fetch(`${st.workerUrl.replace(/\/$/, '')}/state`, {
+        headers: { 'x-sidecar-key': st.workerKey },
+      });
+      if (!res.ok) throw new Error(`worker ${res.status} ${res.statusText}`);
+      const body = await res.json() as { escalations?: Escalation[]; heartbeat?: string };
+      remote = body.escalations ?? [];
+    } catch (e) {
+      degraded.push(`worker: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const { escalations, fresh } = merge(watched.escalations, [...remote, ...drafted]);
   // A re-open deserves a notification even though it is not a new finding.
   fresh.push(...watched.reopened);
   const notified: string[] = st.notified ?? [];

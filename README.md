@@ -194,3 +194,32 @@ Stated rather than hidden, because a judge will find them anyway.
 - **`external-blocker` depends on Exa having indexed the dependency.** No result
   is treated as no evidence, so the finding stays below the surfacing floor —
   quiet rather than wrong.
+
+---
+
+## Optional: the cloud watcher
+
+`chrome.alarms` only fires while Chrome is running, so the extension's own sweep
+stops when you close the lid. `worker/` is a Cloudflare Worker that runs the
+**same core modules** on a cron trigger, so the agent keeps finding things while
+nothing of yours is on.
+
+It is deliberately **not** a token proxy. It holds its own credential, never sees
+your browser's, and is read-only to the extension — it finds, it never writes.
+Escalation ids are `key:rule`, so a finding derived by either watcher is the same
+card: merging two independent sweeps is idempotent by construction, and the
+merge still refuses to overwrite anything you decided.
+
+```bash
+cd worker
+npx wrangler kv namespace create SIDECAR     # put the id in wrangler.jsonc
+npx wrangler secret put GITHUB_TOKEN
+npx wrangler secret put OPENROUTER_KEY
+npx wrangler secret put EXA_KEY
+npx wrangler secret put READ_KEY             # any random string
+npx wrangler deploy
+```
+
+Then paste the deployed URL and the same `READ_KEY` into the extension's options.
+Leave both blank and the extension works exactly as before — the Worker is an
+upgrade, never a dependency.

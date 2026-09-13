@@ -39,6 +39,13 @@
 <input id="repos" type="text" placeholder="ponli550/XYZ, ponli550/*">
 <div class="hint">Comma separated. Empty means the agent can write nowhere — that is the default.</div>
 
+<label for="wurl">Cloud watcher URL</label>
+<input id="wurl" type="text" placeholder="https://sidecar-watcher.you.workers.dev">
+<div class="hint">Optional. Keeps sweeping while Chrome is closed. Read-only — it never writes to GitHub and never holds your browser's token.</div>
+
+<label for="wkey">Cloud watcher key</label>
+<input id="wkey" type="password" placeholder="shared read key" autocomplete="off">
+
 <label>Write capabilities</label>
 <div class="caps">
   <label><input type="checkbox" id="cap-comment"> comment</label>

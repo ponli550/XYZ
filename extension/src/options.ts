@@ -3,13 +3,15 @@
 const $ = (id: string) => document.getElementById(id) as HTMLInputElement;
 
 const KEYS = ['githubToken', 'openrouterKey', 'exaKey', 'model', 'repos',
-              'capabilities', 'paused'] as const;
+              'capabilities', 'paused', 'workerUrl', 'workerKey'] as const;
 
 async function restore(): Promise<void> {
   const s = await chrome.storage.local.get([...KEYS]);
   $('gh').value = s.githubToken ?? '';
   $('or').value = s.openrouterKey ?? '';
   $('exa').value = s.exaKey ?? '';
+  $('wurl').value = s.workerUrl ?? '';
+  $('wkey').value = s.workerKey ?? '';
   $('model').value = s.model ?? 'openai/gpt-4o-mini';
   $('repos').value = (s.repos ?? []).join(', ');
   const caps: string[] = s.capabilities ?? [];
@@ -27,6 +29,8 @@ async function save(): Promise<void> {
     githubToken: $('gh').value.trim(),
     openrouterKey: $('or').value.trim(),
     exaKey: $('exa').value.trim(),
+    workerUrl: $('wurl').value.trim(),
+    workerKey: $('wkey').value.trim(),
     model: $('model').value.trim() || 'openai/gpt-4o-mini',
     repos: $('repos').value.split(',').map((r) => r.trim()).filter(Boolean),
     capabilities,

@@ -9,13 +9,17 @@
     "model",
     "repos",
     "capabilities",
-    "paused"
+    "paused",
+    "workerUrl",
+    "workerKey"
   ];
   async function restore() {
     const s = await chrome.storage.local.get([...KEYS]);
     $("gh").value = s.githubToken ?? "";
     $("or").value = s.openrouterKey ?? "";
     $("exa").value = s.exaKey ?? "";
+    $("wurl").value = s.workerUrl ?? "";
+    $("wkey").value = s.workerKey ?? "";
     $("model").value = s.model ?? "openai/gpt-4o-mini";
     $("repos").value = (s.repos ?? []).join(", ");
     const caps = s.capabilities ?? [];
@@ -32,6 +36,8 @@
       githubToken: $("gh").value.trim(),
       openrouterKey: $("or").value.trim(),
       exaKey: $("exa").value.trim(),
+      workerUrl: $("wurl").value.trim(),
+      workerKey: $("wkey").value.trim(),
       model: $("model").value.trim() || "openai/gpt-4o-mini",
       repos: $("repos").value.split(",").map((r) => r.trim()).filter(Boolean),
       capabilities,
