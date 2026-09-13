@@ -3,15 +3,35 @@
   "name": "Sidecar",
   "version": "0.1.0",
   "description": "An agent that is already on the issue when you open it.",
-  "permissions": ["storage", "alarms", "notifications"],
-  "host_permissions": ["https://github.com/*"],
-  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
-      "matches": ["https://github.com/*/issues/*", "https://github.com/*/pull/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://github.com/*/issues/*",
+        "https://github.com/*/pull/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "action": { "default_title": "Sidecar" }
+  "action": {
+    "default_title": "Sidecar",
+    "default_icon": "icon128.png"
+  },
+  "icons": {
+    "128": "icon128.png"
+  }
 }
