@@ -17,7 +17,7 @@ export type EscalationState =
 
 export type Severity = 'conflict' | 'stale' | 'duplicate' | 'external';
 
-export type SourceSystem = 'slack' | 'calendar' | 'jira' | 'exa';
+export type SourceSystem = 'slack' | 'calendar' | 'github' | 'exa';
 
 export interface Source {
   system: SourceSystem;
@@ -132,7 +132,7 @@ export const SURFACE_AT = 0.6;   // suppression floor: below this the human neve
 export const CONFIRM_AT = 0.8;
 
 const WEIGHT: Record<SourceSystem, number> = {
-  jira: 0.4,      // the page itself — necessary, not sufficient
+  github: 0.4,    // the page itself — necessary, not sufficient
   slack: 0.35,
   calendar: 0.2,
   exa: 0.3,

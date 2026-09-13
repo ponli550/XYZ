@@ -21,7 +21,7 @@ test('parses a reset epoch, else falls back to a cooldown', () => {
 test('a refusal defers work and does NOT report success', async () => {
   let clock = 0;
   const guard = new BudgetGuard<string>(() => clock);
-  const res = await guarded(guard, 'GTI-142', async () => { throw new Error('429 too many requests'); });
+  const res = await guarded(guard, 'o/r#1', async () => { throw new Error('429 too many requests'); });
   assert.equal(res.ok, false);
   assert.equal(guard.pending(), 1, 'work is parked, not lost');
   assert.ok(guard.limited());

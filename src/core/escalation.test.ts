@@ -10,9 +10,9 @@ const src = (system: Source['system'], at = '2026-09-11T16:02:00Z'): Source =>
   ({ system, url: `https://example/${system}`, excerpt: 'x', at });
 
 const seed = (over: Partial<Escalation> = {}): Escalation => ({
-  id: 'e1', ticketKey: 'GTI-142', state: 'suspected', severity: 'conflict',
+  id: 'e1', ticketKey: 'o/r#1', state: 'suspected', severity: 'conflict',
   claim: 'Ticket says blocked; the dependency shipped.',
-  evidence: [src('jira')], confidence: 0.4, proposal: null, history: [],
+  evidence: [src('github')], confidence: 0.4, proposal: null, history: [],
   detectedAt: '2026-09-13T03:14:00Z', detectedBy: 'ambient', ...over,
 });
 
@@ -44,14 +44,14 @@ test('transition is immutable and appends history', () => {
 });
 
 test('confidence counts distinct systems, not repeated sources', () => {
-  assert.equal(confidenceFor([src('jira')]), 0.4);
-  assert.equal(confidenceFor([src('jira'), src('jira'), src('jira')]), 0.4);
-  assert.equal(confidenceFor([src('jira'), src('slack')]), 0.75);
-  assert.ok(confidenceFor([src('jira'), src('slack'), src('calendar')]) >= 0.8);
+  assert.equal(confidenceFor([src('github')]), 0.4);
+  assert.equal(confidenceFor([src('github'), src('github'), src('github')]), 0.4);
+  assert.equal(confidenceFor([src('github'), src('slack')]), 0.75);
+  assert.ok(confidenceFor([src('github'), src('slack'), src('calendar')]) >= 0.8);
 });
 
 test('never claims certainty', () => {
-  const all = [src('jira'), src('slack'), src('calendar'), src('exa')];
+  const all = [src('github'), src('slack'), src('calendar'), src('exa')];
   assert.ok(confidenceFor(all) <= 0.95);
 });
 
@@ -67,7 +67,7 @@ test('corroborating walks the ladder and confirms on its own', () => {
 });
 
 test('suppression floor: low confidence is never actionable', () => {
-  const weak = seed({ confidence: SURFACE_AT - 0.01, proposal: { kind: 'comment', ticketKey: 'GTI-1', body: 'x' } });
+  const weak = seed({ confidence: SURFACE_AT - 0.01, proposal: { kind: 'comment', ticketKey: 'o/r#1', body: 'x' } });
   assert.ok(!isActionable(weak));
   const strong = { ...weak, confidence: SURFACE_AT };
   assert.ok(isActionable(strong));
@@ -80,7 +80,7 @@ test('confirmed without a proposal is not actionable', () => {
 test('a failed write returns approved -> proposed, not verified', () => {
   const e = transition(
     transition(seed({ state: 'confirmed', confidence: 0.85 }), 'proposed', 'surfaced',
-      { proposal: { kind: 'comment', ticketKey: 'GTI-142', body: 'unblocking' } }),
+      { proposal: { kind: 'comment', ticketKey: 'o/r#1', body: 'unblocking' } }),
     'approved', 'human approved');
   assert.ok(canTransition(e.state, 'proposed'));
   assert.ok(canTransition(e.state, 'verified'));

@@ -37,10 +37,10 @@ async function poll(): Promise<void> {
 chrome.notifications.onClicked.addListener(async (id) => {
   const { escalations = [] } = await chrome.storage.local.get('escalations');
   const e = (escalations as Escalation[]).find((x) => x.id === id);
-  if (e) await chrome.tabs.create({ url: `https://your-site.atlassian.net/browse/${e.ticketKey}` });
+  if (e) await chrome.tabs.create({ url: `https://github.com/${e.ticketKey.replace('#', '/issues/')}` });
 });
 
 chrome.runtime.onMessage.addListener((msg) => {
-  // #6 wires approve/dismiss to the real Jira write here.
+  // #6 wires approve/dismiss to the real GitHub write here.
   console.info('[sidecar]', msg);
 });

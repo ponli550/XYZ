@@ -1,12 +1,11 @@
-// Content script. Two jobs: keep the shadow host alive across Jira's SPA
-// navigation, and keep the rail showing the escalations for whatever ticket is
-// currently on screen.
+// Content script. Two jobs: keep the shadow host alive across GitHub's SPA
+// navigation, and keep the rail showing the escalations for whatever issue or
+// PR is currently on screen.
 //
-// Jira Cloud is a React SPA with history-API routing: there is no page load
-// between tickets, the URL changes under you, and React will happily unmount
-// anything it thinks it owns. So the host element is appended to
-// document.documentElement (outside Jira's React root) and re-checked on every
-// route change.
+// GitHub routes with Turbo: no page load between issues, the URL changes under
+// you, and the <turbo-frame> swap replaces large subtrees. So the host element
+// is appended to document.documentElement (outside anything Turbo owns) and
+// re-checked on every route change.
 import { renderRail, type RailModel } from './rail.ts';
 import { FIXTURES, COUNTER } from '../../src/core/fixtures.ts';
 import type { Escalation } from '../../src/core/escalation.ts';
@@ -21,17 +20,20 @@ function ensureHost(): ShadowRoot {
   if (existing?.shadowRoot) return existing.shadowRoot;
   const host = document.createElement('div');
   host.id = HOST_ID;
-  // documentElement, not body: Jira re-renders body subtrees.
+  // documentElement, not body: Turbo swaps body subtrees.
   document.documentElement.append(host);
   return host.attachShadow({ mode: 'open' });
 }
 
-/** GTI-142 out of /browse/GTI-142 or /jira/software/projects/GTI/boards/1?selectedIssue=GTI-142 */
+/**
+ * "owner/repo#7" out of /owner/repo/issues/7 or /owner/repo/pull/7.
+ * Issues and PRs share a number space on GitHub, so one key covers both and
+ * an escalation raised on an issue still matches when you open its PR.
+ */
 export function ticketKeyFrom(url: string): string | null {
-  const u = new URL(url, 'https://x.invalid');
-  const q = u.searchParams.get('selectedIssue');
-  if (q && /^[A-Z][A-Z0-9]+-\d+$/.test(q)) return q;
-  return u.pathname.match(/\/browse\/([A-Z][A-Z0-9]+-\d+)/)?.[1] ?? null;
+  const m = new URL(url, 'https://x.invalid').pathname
+    .match(/^\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)(?:\/|$)/);
+  return m ? `${m[1]}/${m[2]}#${m[3]}` : null;
 }
 
 async function load(ticketKey: string): Promise<RailModel> {
@@ -62,10 +64,10 @@ async function paint(): Promise<void> {
 }
 
 /**
- * Jira routes with pushState/replaceState, neither of which fires an event.
- * Patching them is the only way to hear the navigation the same tick it
- * happens; popstate covers back/forward. A MutationObserver on the whole
- * document would also work and would cost far more.
+ * GitHub's Turbo routes with pushState/replaceState, neither of which fires an
+ * event. Patching them is the only way to hear the navigation the same tick it
+ * happens; popstate covers back/forward. Turbo also emits turbo:load, but
+ * patching history covers the cases Turbo doesn't drive.
  */
 function onRouteChange(fn: () => void): void {
   for (const m of ['pushState', 'replaceState'] as const) {
@@ -89,8 +91,8 @@ function tick(): void {
 // unit tests, which exercise ticketKeyFrom without a DOM.
 if (typeof history !== 'undefined' && typeof chrome !== 'undefined') {
   onRouteChange(tick);
-  // Jira sometimes swaps the issue view without touching history; a cheap poll
-  // catches that without observing the entire document.
+  // Turbo frame swaps can land without a history entry; a cheap poll catches
+  // that without observing the entire document.
   setInterval(tick, 1000);
   tick();
 

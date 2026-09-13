@@ -1,5 +1,5 @@
-// The rail. Rendered into a shadow root so Jira's stylesheet cannot reach it
-// and ours cannot reach Jira's — a content script that leaks CSS into the host
+// The rail. Rendered into a shadow root so GitHub's stylesheet cannot reach it
+// and ours cannot reach GitHub's — a content script that leaks CSS into the host
 // app is the fastest way to look broken on someone else's page.
 import type { Escalation } from '../../src/core/escalation.ts';
 

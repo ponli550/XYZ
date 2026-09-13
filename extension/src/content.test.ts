@@ -2,16 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ticketKeyFrom } from './content.ts';
 
-test('reads the ticket key from both Jira URL shapes', () => {
-  assert.equal(ticketKeyFrom('https://x.atlassian.net/browse/GTI-142'), 'GTI-142');
-  assert.equal(ticketKeyFrom('https://x.atlassian.net/browse/GTI-142?focusedId=9'), 'GTI-142');
-  assert.equal(
-    ticketKeyFrom('https://x.atlassian.net/jira/software/projects/GTI/boards/1?selectedIssue=GTI-207'),
-    'GTI-207');
+test('reads owner/repo#n from issue and PR URLs', () => {
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/issues/5'), 'ponli550/XYZ#5');
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/pull/12'), 'ponli550/XYZ#12');
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/issues/5#issuecomment-99'), 'ponli550/XYZ#5');
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/pull/12/files'), 'ponli550/XYZ#12');
 });
 
-test('returns null off a ticket, so the rail unmounts instead of lingering', () => {
-  assert.equal(ticketKeyFrom('https://x.atlassian.net/jira/your-work'), null);
-  assert.equal(ticketKeyFrom('https://x.atlassian.net/browse/'), null);
-  assert.equal(ticketKeyFrom('https://x.atlassian.net/browse/notaticket'), null);
+test('issues and PRs share a number space, so one key covers both', () => {
+  assert.equal(ticketKeyFrom('https://github.com/o/r/issues/7'),
+               ticketKeyFrom('https://github.com/o/r/pull/7'));
+});
+
+test('returns null off an issue, so the rail unmounts instead of lingering', () => {
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ'), null);
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/issues'), null);
+  assert.equal(ticketKeyFrom('https://github.com/ponli550/XYZ/milestone/1'), null);
 });
